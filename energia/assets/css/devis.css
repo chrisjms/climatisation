@@ -1,0 +1,117 @@
+/* =========================================================
+   Devis – Grille & Suggestions (ENERGIA)
+   Fichier : /assets/css/devis.css
+   ========================================================= */
+
+/* En‑tête de colonnes (par pièce) : [Recherche unifiée] | Nom | Qté | Prix | TVA | X */
+.pac-heads {
+  display: grid;
+  grid-template-columns: 2.8fr 2.4fr 0.54fr 0.67fr 0.40fr 40px; /* [Code/Matériel] | Nom | Qté | Prix | TVA | X */
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 12px;
+  color: #667;
+}
+
+/* Ligne de saisie : même grille */
+.pac-group {
+  display: grid;
+  grid-template-columns: 2.8fr 2.4fr 0.54fr 0.67fr 0.40fr 40px;
+  gap: 8px;
+  align-items: center;
+}
+
+.pac-select-wrap {
+  position: relative;
+  z-index: 10; /* suggestions au-dessus */
+}
+
+.list-btn {
+  border: 1px solid #ccc;
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+/* === Champ de recherche unifié Code/Matériel === */
+.pac-search-uni {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Suggestions / Liste (volet unique) */
+.pac-suggestions,
+.pac-list-all {
+  position: absolute;
+  left: 0; right: 0; top: 100%;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  z-index: 20;
+  max-height: 260px;
+  overflow: auto;
+  margin-top: 6px;
+  display: none;
+}
+
+/* Items des suggestions : CODE | Matériel | Prix */
+.pac-suggestions .item,
+.pac-list-all .item {
+  display: grid;
+  grid-template-columns: 1.0fr 2.2fr 0.9fr; /* Code | Nom | Prix */
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.pac-suggestions .item:hover,
+.pac-list-all .item:hover { background: #f3f6fb; }
+
+.pac-suggestions .code,
+.pac-list-all .code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-weight: 600;
+}
+
+.pac-suggestions .name,
+.pac-list-all .name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pac-suggestions .price,
+.pac-list-all .price {
+  text-align: right;
+  color: #445;
+}
+
+.pac-suggestions .hl,
+.pac-list-all .hl {
+  background: #ffec99;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* Utilitaires (alignés sur ton style existant) */
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+.small { font-size: 12px; }
+.muted.small { color:#6b7280; }
+.code-under { margin-top:4px; }
+.eco-under { margin-top:6px; }
+
+/* Responsive : on garde [Recherche] | Nom | Qté | Prix visibles, cache TVA et X */
+@media (max-width: 980px) {
+  .pac-heads,
+  .pac-group {
+    grid-template-columns: 1fr 1.4fr 0.6fr 0.8fr; /* [Recherche] | Nom | Qté | Prix */
+    grid-auto-rows: auto;
+  }
+  .pac-heads :nth-child(5), /* TVA */
+  .pac-group :nth-child(5),
+  .pac-heads :nth-child(6), /* X */
+  .pac-group :nth-child(6)  { display: none; }
+}
