@@ -3,6 +3,11 @@
 // Compatible avec vos pages existantes (clients, devis, factures, matériels, brochures)
 // et tolérant aux schémas de BDD variés (auto-détection colonnes).
 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+
+echo "DEBUG START<br>";
 // --- Debug (à retirer en prod)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -73,7 +78,7 @@ $hasBroch   = table_exists($pdo, 'brochures');
 $broCols    = $hasBroch ? list_columns($pdo, 'brochures') : [];
 $brDate     = $hasBroch ? first_col(['date_ajout','created_at','uploaded_at','date'], $broCols, 'date_ajout') : null;
 
-// Lignes de devis (pour “Top matériels”)
+// Lignes de devis (pour "Top matériels")
 $hasPac     = table_exists($pdo, 'pompes_a_chaleur');
 $pacCols    = $hasPac ? list_columns($pdo, 'pompes_a_chaleur') : [];
 $pacNameCol = $hasPac ? first_col(['nom','name','label'], $pacCols, 'nom') : null;
@@ -279,87 +284,111 @@ if ($hasFact) {
     <title>Accueil — Tableau de bord</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
-    <style>
-      /* Habillage léger pour la page d'accueil */
-      .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:10px 0 16px}
-      @media (max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-      @media (max-width:640px){.kpi-grid{grid-template-columns:1fr}}
-      .kpi{border:1px solid #e8e8e8;border-radius:12px;padding:12px;background:#fff}
-      .kpi .label{color:#556; font-size:.95em}
-      .kpi .value{font-size:1.6em;font-weight:700}
-      .kpi .sub{color:#888;font-size:.85em}
-      .cards{display:grid;grid-template-columns:1.2fr .8fr; gap:12px}
-      @media (max-width:1100px){.cards{grid-template-columns:1fr}}
-      .card{border:1px solid #e8e8e8;border-radius:12px;background:#fff}
-      .card h3{margin:0;padding:10px 12px;border-bottom:1px solid #eee}
-      .card .body{padding:10px 12px}
-      .activity li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed #eee}
-      .activity li:last-child{border-bottom:none}
-      .muted{color:#777}
-      .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-      .btn{display:inline-block;border:1px solid #ddd;border-radius:10px;padding:6px 10px;background:#fff;text-decoration:none}
-      .quick{display:flex;gap:8px;flex-wrap:wrap}
-      table.compact{width:100%}
-      table.compact th, table.compact td{padding:6px 8px;border-bottom:1px solid #f1f1f1}
-      .badge{display:inline-block;background:#eef3ff;border:1px solid #dfe6ff;border-radius:999px;padding:2px 8px}
-    </style>
 </head>
 <body>
 <?php require __DIR__ . '/inc/sidebar.php'; ?>
 
 <div class="main">
-    <h1 style="margin-bottom:4px">Bienvenue, <?= h($_SESSION['username'] ?? 'Utilisateur') ?></h1>
-    <div class="muted">Aujourd’hui : <?= dmy($today) ?></div>
-
-    <!-- Raccourcis -->
-    <div class="quick" style="margin:12px 0 6px">
-        <a class="btn" href="devis.php#form-devis">➕ Nouveau devis</a>
-        <a class="btn" href="ajout_client.php?retour=dashboard.php">👤 Nouveau client</a>
-        <a class="btn" href="ajout_pac.php">🧰 Gérer matériels</a>
-        <a class="btn" href="brochures.php">📤 Uploader brochure</a>
-        <a class="btn" href="clientele.php">📇 Clientèle</a>
+    <div class="page-header">
+        <div>
+            <h1>Bonjour, <?= h($_SESSION['username'] ?? 'Utilisateur') ?></h1>
+            <div class="subtitle"><?= dmy($today) ?> — Tableau de bord</div>
+        </div>
     </div>
 
-    <!-- KPIs -->
+    <!-- Quick actions -->
+    <div class="quick-actions">
+        <a class="btn btn-primary" href="devis.php#form-devis">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            Nouveau devis
+        </a>
+        <a class="btn" href="ajout_client.php?retour=index.php">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+            Nouveau client
+        </a>
+        <a class="btn" href="ajout_pac.php">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+            Materiels
+        </a>
+        <a class="btn" href="brochures.php">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            Brochures
+        </a>
+        <a class="btn" href="clientele.php">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Clientele
+        </a>
+    </div>
+
+    <!-- KPI Cards -->
     <div class="kpi-grid">
-        <div class="kpi">
-            <div class="label">Clients</div>
-            <div class="value"><?= (int)$nbClients ?></div>
-            <div class="sub muted">Total en base</div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="stat-label">Clients</div>
+            <div class="stat-value"><?= (int)$nbClients ?></div>
+            <div class="stat-sub">Total en base</div>
         </div>
-        <div class="kpi">
-            <div class="label">CA du mois (TTC)</div>
-            <div class="value"><?= eur($caMonth) ?></div>
-            <div class="sub muted">Période : <?= dmy($firstMonth) ?> → <?= dmy($today) ?></div>
+        <div class="stat-card green">
+            <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+            </div>
+            <div class="stat-label">CA du mois (TTC)</div>
+            <div class="stat-value"><?= eur($caMonth) ?></div>
+            <div class="stat-sub"><?= dmy($firstMonth) ?> &rarr; <?= dmy($today) ?></div>
         </div>
-        <div class="kpi">
-            <div class="label">CA annuel (TTC)</div>
-            <div class="value"><?= eur($caYear) ?></div>
-            <div class="sub muted">Depuis le 01/01</div>
+        <div class="stat-card green">
+            <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+            </div>
+            <div class="stat-label">CA annuel (TTC)</div>
+            <div class="stat-value"><?= eur($caYear) ?></div>
+            <div class="stat-sub">Depuis le 01/01</div>
         </div>
+        <?php if ($impayes !== null): ?>
+        <div class="stat-card <?= $impayes > 0 ? 'orange' : 'green' ?>">
+            <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+            </div>
+            <div class="stat-label">Impayes</div>
+            <div class="stat-value"><?= eur($impayes) ?></div>
+            <div class="stat-sub">Factures en attente</div>
+        </div>
+        <?php endif; ?>
     </div>
 
-    <!-- Deux colonnes -->
-    <div class="cards">
+    <!-- Two-column layout -->
+    <div class="dashboard-grid">
 
-        <!-- Colonne gauche -->
-        <div class="card">
-            <h3>Activité récente</h3>
-            <div class="body">
+        <!-- Left column -->
+        <div class="card" style="padding:0;overflow:hidden;">
+            <div class="card-section">
+                <h3>Activite recente</h3>
                 <?php if (!$activite): ?>
-                    <div class="muted">Aucune activité récente.</div>
+                    <p class="muted">Aucune activite recente.</p>
                 <?php else: ?>
-                    <ul class="activity" style="list-style:none;margin:0;padding:0">
-                        <?php foreach ($activite as $a): ?>
+                    <ul class="activity-list">
+                        <?php foreach ($activite as $a):
+                            $badgeClass = match($a['type']) {
+                                'Client' => '',
+                                'Devis' => 'warning',
+                                'Devis' => 'success',
+                                'Brochure' => 'neutral',
+                                default => ''
+                            };
+                        ?>
                             <li>
                                 <span>
-                                    <span class="badge"><?= h($a['type']) ?></span>
+                                    <span class="badge <?= $badgeClass ?>">
+    <?= h($a['type']) ?>
+</span>
                                     &nbsp;<?= h($a['label']) ?>
                                 </span>
-                                <span class="muted mono">
+                                <span class="muted mono" style="display:flex;align-items:center;gap:8px;">
                                     <?= dmy($a['date']) ?>
                                     <?php if (!empty($a['url'])): ?>
-                                        &nbsp;<a class="btn" href="<?= h($a['url']) ?>">Ouvrir</a>
+                                        <a class="btn btn-sm" href="<?= h($a['url']) ?>">Ouvrir</a>
                                     <?php endif; ?>
                                 </span>
                             </li>
@@ -368,8 +397,8 @@ if ($hasFact) {
                 <?php endif; ?>
             </div>
 
-            <h3>Derniers devis (TTC)</h3>
-            <div class="body">
+            <div class="card-section">
+                <h3>Derniers devis (TTC)</h3>
                 <?php if ($derniersDevis): ?>
                     <table class="compact">
                         <thead><tr><th>Client</th><th>Date</th><th style="text-align:right">Montant</th><th>PDF</th></tr></thead>
@@ -380,21 +409,21 @@ if ($hasFact) {
                             $hasFile  = $fileName && file_exists(__DIR__ . "/devis_pdf/$fileName");
                         ?>
                             <tr>
-                                <td><?= h(trim(($d['nom']??'').' '.($d['prenom']??''))) ?></td>
+                                <td><?= h(trim(($d['nom'] ?? '') . ' ' . ($d['prenom'] ?? ''))) ?></td>
                                 <td class="mono"><?= dmy($d['date_creation'] ?? '') ?></td>
                                 <td class="mono" style="text-align:right"><?= eur($d['prix'] ?? null) ?></td>
-                                <td><?= $hasFile ? '<a href="'.h($url).'" target="_blank">📄 Ouvrir</a>' : '<span class="muted">(manquant)</span>' ?></td>
+                                <td><?= $hasFile ? '<a href="'.h($url).'" target="_blank">Ouvrir</a>' : '<span class="muted">—</span>' ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
                 <?php else: ?>
-                    <div class="muted">Aucun devis.</div>
+                    <p class="muted">Aucun devis.</p>
                 <?php endif; ?>
             </div>
 
-            <h3>Dernières factures (TTC)</h3>
-            <div class="body">
+            <div class="card-section">
+                <h3>Dernieres factures (TTC)</h3>
                 <?php if ($dernieresFactures): ?>
                     <table class="compact">
                         <thead><tr><th>Client</th><th>Date</th><th style="text-align:right">Montant</th><th>PDF</th></tr></thead>
@@ -405,48 +434,54 @@ if ($hasFact) {
                             $hasFile   = $fileNameF && file_exists(__DIR__ . "/facture_pdf/$fileNameF");
                         ?>
                             <tr>
-                                <td><?= h(trim(($f['nom']??'').' '.($f['prenom']??''))) ?></td>
+                                <td><?= h(trim(($f['nom'] ?? '') . ' ' . ($f['prenom'] ?? ''))) ?></td>
                                 <td class="mono"><?= dmy($f['date_creation'] ?? '') ?></td>
                                 <td class="mono" style="text-align:right"><?= eur($f['prix'] ?? null) ?></td>
-                                <td><?= $hasFile ? '<a href="'.h($urlF).'" target="_blank">📄 Ouvrir</a>' : '<span class="muted">(manquant)</span>' ?></td>
+                                <td><?= $hasFile ? '<a href="'.h($urlF).'" target="_blank">Ouvrir</a>' : '<span class="muted">—</span>' ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
                 <?php else: ?>
-                    <div class="muted">Aucune facture.</div>
+                    <p class="muted">Aucune facture.</p>
                 <?php endif; ?>
             </div>
         </div>
 
-        <!-- Colonne droite -->
-        <div class="card">
-            <h3>Vue pipeline</h3>
-            <div class="body">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                    <div class="kpi" style="padding:10px">
-                        <div class="label">Devis (30 derniers jours)</div>
-                        <div class="value">
-                            <?php
-                            $dv30 = 0; $sumDv30 = 0.0;
-                            if ($hasDevis) {
-                                $st = $pdo->prepare("SELECT COUNT(*), COALESCE(SUM($dvTotal),0) FROM devis WHERE DATE($dvDate) >= :dmin");
-                                $st->execute([':dmin'=>date('Y-m-d', strtotime('-30 days'))]);
-                                [$dv30, $sumDv30] = $st->fetch(PDO::FETCH_NUM);
-                            }
-                            echo (int)$dv30;
-                            ?>
-                        </div>
-                        <div class="sub muted">Montant cumulé : <?= eur($sumDv30 ?? 0) ?></div>
-                    </div>
+        <!-- Right column -->
+        <div style="display:grid;gap:var(--gap-3);align-content:start;">
+            <!-- Pipeline -->
+            <div class="card">
+                <h3 style="margin-bottom:12px;">Vue pipeline</h3>
+                <?php
+                $dv30 = 0; $sumDv30 = 0.0;
+                if ($hasDevis) {
+                    $st = $pdo->prepare("SELECT COUNT(*), COALESCE(SUM($dvTotal),0) FROM devis WHERE DATE($dvDate) >= :dmin");
+                    $st->execute([
+    ':dmin' => date('Y-m-d', strtotime('-30 days'))
+]); 
+                    [$dv30, $sumDv30] = $st->fetch(PDO::FETCH_NUM);
+                }
+                ?>
+                <div class="stat-card" style="box-shadow:none;border:1px solid var(--bd);">
+                    <div class="stat-label">Devis (30 derniers jours)</div>
+                    <div class="stat-value"><?= (int)$dv30 ?></div>
+                    <div class="stat-sub">Montant cumule : <?= eur($sumDv30 ?? 0) ?></div>
                 </div>
+                <?php if ($toFollow !== null && $toFollow > 0): ?>
+                <div class="stat-card orange" style="box-shadow:none;border:1px solid var(--bd);margin-top:8px;">
+                    <div class="stat-label">Devis a relancer</div>
+                    <div class="stat-value"><?= (int)$toFollow ?></div>
+                    <div class="stat-sub">Sans facture associee (30j)</div>
+                </div>
+                <?php endif; ?>
             </div>
 
             <?php if (!empty($topPac)): ?>
-            <h3>Top matériels (90 jours)</h3>
-            <div class="body">
+            <div class="card">
+                <h3>Top materiels (90 jours)</h3>
                 <table class="compact">
-                    <thead><tr><th>Matériel</th><th style="text-align:right">Qté</th><th style="text-align:right">CA (HT)</th></tr></thead>
+                    <thead><tr><th>Materiel</th><th style="text-align:right">Qte</th><th style="text-align:right">CA (HT)</th></tr></thead>
                     <tbody>
                     <?php foreach ($topPac as $p): ?>
                         <tr>
@@ -461,14 +496,16 @@ if ($hasFact) {
             <?php endif; ?>
 
             <?php if (!empty($caMonths)): ?>
-            <h3>CA — 6 derniers mois (TTC)</h3>
-            <div class="body">
+            <div class="card">
+                <h3>CA — 6 derniers mois (TTC)</h3>
                 <table class="compact">
                     <thead><tr><th>Mois</th><th style="text-align:right">Total</th></tr></thead>
                     <tbody>
                     <?php foreach ($caMonths as $row): ?>
                         <tr>
-                            <td class="mono"><?= h(date('m/Y', strtotime($row['mois'].'-01'))) ?></td>
+                            <td class="mono">
+    <?= h(date('m/Y', strtotime($row['mois'] . '-01'))) ?>
+</td>
                             <td class="mono" style="text-align:right"><?= eur($row['total']) ?></td>
                         </tr>
                     <?php endforeach; ?>

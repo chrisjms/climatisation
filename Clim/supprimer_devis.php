@@ -10,7 +10,7 @@ if ($devis_id) {
     if ($fichier_pdf && file_exists($fichier_pdf)) {
         unlink($fichier_pdf);
     }
-    // 2. Supprimer l’enregistrement en base
+    // 2. Supprimer l'enregistrement en base
     $stmt = $pdo->prepare('DELETE FROM devis WHERE id = ?');
     $stmt->execute([$devis_id]);
 }

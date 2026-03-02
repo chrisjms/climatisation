@@ -225,7 +225,7 @@ $badgeText = match ($view) {
     'day'   => 'Périmètre : '.DAY_WINDOW.' derniers jours',
     'month' => 'Périmètre : '.MONTH_WINDOW.' mois glissants',
     'year'  => 'Périmètre : '.YEAR_WINDOW.' dernières années',
-    'all'   => 'Périmètre : tout l’historique',
+    'all'   => 'Périmètre : tout l'historique',
 };
 
 /* Texte pour titres */
@@ -239,6 +239,7 @@ $granularityText = granularityText($view === 'all' ? 'year' : $view);
 <head>
 <meta charset="UTF-8">
 <title>Analyses & rapports</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="style.css">
 <!-- Chart.js (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -248,20 +249,20 @@ $granularityText = granularityText($view === 'all' ? 'year' : $view);
 
 
 <div class="main">
-    <h1>Analyses & rapports</h1>
+    <div class="page-header">
+      <div>
+        <h1>Analyses & rapports</h1>
+        <div class="subtitle">Statistiques et indicateurs de performance</div>
+      </div>
+    </div>
 
     <div class="toolbar">
-        <form method="get" action="analyses.php" class="inline">
-            <label for="view">Visibilité :</label>
-            <select name="view" id="view" onchange="this.form.submit()">
-                <option value="day"   <?= $view==='day'  ?'selected':'' ?>>Par jours (<?= DAY_WINDOW ?> derniers)</option>
-                <option value="month" <?= $view==='month'?'selected':'' ?>>Par mois (<?= MONTH_WINDOW ?> derniers)</option>
-                <option value="year"  <?= $view==='year'?'selected':''  ?>>Par année (<?= YEAR_WINDOW ?> dernières)</option>
-                <option value="all"   <?= $view==='all'  ?'selected':'' ?>>Tout (historique)</option>
-            </select>
-            <noscript><button type="submit" class="btn">Afficher</button></noscript>
-        </form>
-
+        <div class="view-tabs">
+            <a href="analyses.php?view=day" class="view-tab <?= $view==='day' ? 'active' : '' ?>">Jours</a>
+            <a href="analyses.php?view=month" class="view-tab <?= $view==='month' ? 'active' : '' ?>">Mois</a>
+            <a href="analyses.php?view=year" class="view-tab <?= $view==='year' ? 'active' : '' ?>">Annees</a>
+            <a href="analyses.php?view=all" class="view-tab <?= $view==='all' ? 'active' : '' ?>">Historique</a>
+        </div>
         <span class="badge"><?= htmlspecialchars($badgeText) ?></span>
     </div>
 
@@ -269,28 +270,28 @@ $granularityText = granularityText($view === 'all' ? 'year' : $view);
 
         <!-- Cartes Graphiques -->
         <div class="card">
-            <h3>Nombre de devis (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l’historique' : '' ?>)</h3>
+            <h3>Nombre de devis (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l'historique' : '' ?>)</h3>
             <canvas id="chartCountDevis"></canvas>
         </div>
 
         <div class="card">
-            <h3>Nombre de factures (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l’historique' : '' ?>)</h3>
+            <h3>Nombre de factures (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l'historique' : '' ?>)</h3>
             <canvas id="chartCountFactures"></canvas>
         </div>
 
         <div class="card">
-            <h3>Montant TTC des devis (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l’historique' : '' ?>)</h3>
+            <h3>Montant TTC des devis (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l'historique' : '' ?>)</h3>
             <canvas id="chartTotalDevis"></canvas>
         </div>
 
         <div class="card">
-            <h3>Montant TTC des factures (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l’historique' : '' ?>)</h3>
+            <h3>Montant TTC des factures (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l'historique' : '' ?>)</h3>
             <canvas id="chartTotalFactures"></canvas>
         </div>
 
         <!-- Chiffre d'affaires TTC (factures) -->
         <div class="card full">
-            <h3>Chiffre d’affaires TTC (Factures)</h3>
+            <h3>Chiffre d'affaires TTC (Factures)</h3>
 
             <?php
             $years = $turnover['years'];   // [year => total_ttc]
@@ -302,7 +303,7 @@ $granularityText = granularityText($view === 'all' ? 'year' : $view);
                 <thead>
                     <tr>
                         <th>Année</th>
-                        <th>Chiffre d’affaires TTC</th>
+                        <th>Chiffre d'affaires TTC</th>
                     </tr>
                 </thead>
                 <tbody>

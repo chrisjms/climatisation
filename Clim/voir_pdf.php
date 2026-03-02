@@ -148,7 +148,7 @@ foreach ($candidates as $rel) {
   if (is_file($fs)) { $foundFs = $fs; $foundRel = $rel; break; }
 }
 
-// 5) Pas trouvé → écran d’aide (montre tous les chemins testés)
+// 5) Pas trouvé → écran d'aide (montre tous les chemins testés)
 if (!$foundFs) {
   http_response_code(404);
   header('Content-Type: text/html; charset=utf-8');
@@ -159,7 +159,7 @@ if (!$foundFs) {
   echo "<details open><summary>Chemins testés</summary><ul>";
   foreach ($candidates as $rel) echo "<li>".htmlspecialchars($rel, ENT_QUOTES, 'UTF-8')."</li>";
   echo "</ul></details>";
-  echo "<p>👉 Place le PDF à l’un des chemins ci-dessus (recommandé : <code>".htmlspecialchars($defaultDir, ENT_QUOTES, 'UTF-8')."/</code>) ou ajuste la valeur enregistrée en base dans <code>fichier_pdf</code>.</p>";
+  echo "<p>👉 Place le PDF à l'un des chemins ci-dessus (recommandé : <code>".htmlspecialchars($defaultDir, ENT_QUOTES, 'UTF-8')."/</code>) ou ajuste la valeur enregistrée en base dans <code>fichier_pdf</code>.</p>";
   exit;
 }
 

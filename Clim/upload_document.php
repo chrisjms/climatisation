@@ -47,7 +47,7 @@ function normalize_date_to_sql(?string $in): ?string {
 }
 
 /**
- * Choisit/Crée la colonne de date “métier”.
+ * Choisit/Crée la colonne de date "métier".
  * @return array{col:?string, created:bool}
  */
 function ensure_document_date_column(PDO $pdo): array {
@@ -112,7 +112,7 @@ if (!in_array($mime, $allowed_mime, true)) { redirect_err("Type de fichier non a
 /* Dossier uploads */
 $upload_dir = __DIR__ . '/uploads';
 if (!is_dir($upload_dir) && !mkdir($upload_dir, 0775, true) && !is_dir($upload_dir)) {
-    redirect_err("Impossible de créer le dossier d’upload.", $client_id);
+    redirect_err("Impossible de créer le dossier d'upload.", $client_id);
 }
 
 /* Nom de fichier */
@@ -123,7 +123,7 @@ $target_path = $upload_dir . '/' . $base . '_' . $client_id . '_' . time() . '_'
 
 /* Déplacement */
 if (!move_uploaded_file($file['tmp_name'], $target_path)) {
-    redirect_err("Erreur lors de l’enregistrement du fichier.", $client_id);
+    redirect_err("Erreur lors de l'enregistrement du fichier.", $client_id);
 }
 @chmod($target_path, 0644);
 
@@ -147,14 +147,14 @@ if ($colInfo && isset($colInfo['Type']) && preg_match('/^enum/i', $colInfo['Type
             $defaultSql = ' DEFAULT ' . $pdo->quote($colInfo['Default']);
         }
         $pdo->exec("ALTER TABLE `client_documents` MODIFY `type` VARCHAR(191) $nullSql$defaultSql");
-        // Recharger l’info pour s’assurer du changement (optionnel)
+        // Recharger l'info pour s'assurer du changement (optionnel)
         $colInfo = get_column_info($pdo, 'client_documents', 'type');
     } catch (Throwable $e) {
         // Si la conversion échoue, on vérifiera plus bas avant l'INSERT
     }
 }
 
-/* ───────── Préparer l’insertion (uploaded_at NULL + date métier) ───────── */
+/* ───────── Préparer l'insertion (uploaded_at NULL + date métier) ───────── */
 try {
     $cols_table = list_columns($pdo, 'client_documents');
     $fields = ['client_id','type','nom','file_path'];
@@ -185,14 +185,14 @@ try {
     redirect_ok($msg, $client_id);
 
 } catch (Throwable $e) {
-    // Si l'erreur vient d'un ENUM resté en place (“Incorrect enum value”),
+    // Si l'erreur vient d'un ENUM resté en place ("Incorrect enum value"),
     // on donne une explication utile.
     $msg = $e->getMessage();
     if (stripos($msg, 'Incorrect enum value') !== false) {
         @unlink($target_path);
         redirect_err(
-            "Impossible d’enregistrer le type libre car la colonne `client_documents.type` est encore ENUM. ".
-            "Merci d’exécuter cette commande MySQL puis de réessayer : ".
+            "Impossible d'enregistrer le type libre car la colonne `client_documents.type` est encore ENUM. ".
+            "Merci d'exécuter cette commande MySQL puis de réessayer : ".
             "ALTER TABLE client_documents MODIFY `type` VARCHAR(191) NULL;",
             $client_id
         );

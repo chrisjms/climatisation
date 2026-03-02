@@ -523,7 +523,7 @@ if ($pdf->GetY() < 48) { $pdf->SetY(48); }
 /* === Bloc DATES (uniquement l'échéance côté corps) === */
 $dt_echeance_txt = date('d/m/Y', strtotime($date_echeance));
 $pdf->SetFont('DejaVu','',8);
-$pdf->Cell(0,6,"Date d’échéance : $dt_echeance_txt",0,1,'L');
+$pdf->Cell(0,6,"Date d'échéance : $dt_echeance_txt",0,1,'L');
 $pdf->Ln(1);
 /* =================== */
 

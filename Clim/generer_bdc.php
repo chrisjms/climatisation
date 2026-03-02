@@ -604,7 +604,7 @@ if ($method === 'POST') {
             'titulaire'=>$devis['titulaire'] ?? '',
         ];
     }
-    // Footer : on affiche l'info d’acompte demandé
+    // Footer : on affiche l'info d'acompte demandé
     $payments = [['label'=>'Acompte demandé','montant'=>$acompte_montant]];
 
     $headerMeta = [
@@ -755,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
     <input type="hidden" name="id" value="<?= (int)$devisId ?>">
 
-    <label for="acompte_type">Type d’acompte :</label>
+    <label for="acompte_type">Type d'acompte :</label>
     <select id="acompte_type" name="acompte_type">
       <option value="percent" selected>Pourcentage (%)</option>
       <option value="amount">Montant (€)</option>

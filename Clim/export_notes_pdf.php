@@ -84,7 +84,7 @@ class PDFNotesClient extends tFPDF {
         $this->SetDrawColor(220,220,220);
         $this->Cell(148, 12, mb_strtoupper($this->docTitle, 'UTF-8'), 1, 0, 'C', true);
 
-        // Saut sous l’en-tête
+        // Saut sous l'en-tête
         $this->Ln(20);
     }
 

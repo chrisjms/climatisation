@@ -338,35 +338,6 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
-    <style>
-      .section-nav { position: sticky; top: 0; z-index: 5; background: linear-gradient(180deg, var(--bg), var(--bg-2)); padding: 8px 0 12px; margin: -8px 0 16px; border-bottom: 1px solid var(--bd); }
-      .stack { display:grid; gap:12px; }
-      .grid-2-tight { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-      @media (max-width: 960px){ .grid-2-tight { grid-template-columns: 1fr; } }
-      .card h2 { display:flex; align-items:center; gap:8px; }
-      .nowrap { white-space: nowrap; }
-      .table-docs thead th { position: sticky; top: 0; background: #f6f7f9; }
-      .piece-card { border:1px solid var(--bd,#e1e4e8); border-radius:12px; padding:12px; margin-bottom:12px; background:#fff; }
-      .piece-head { display:flex; justify-content:space-between; align-items:end; gap:12px; margin-bottom:8px; }
-      .piece-title-wrap { display:grid; gap:6px; min-width:220px; }
-      .piece-actions { display:flex; gap:8px; flex-wrap:wrap; }
-      .pac-heads { display:grid; grid-template-columns: 2.2fr 1.8fr 0.8fr 1.0fr 0.8fr 40px; gap:8px; padding:6px 4px; font-size:12px; color:#667; }
-      .lines-container { display:grid; gap:8px; }
-      .pac-group { display:grid; grid-template-columns: 2.2fr 1.8fr 0.8fr 1.0fr 0.8fr 40px; gap:8px; align-items:center; }
-      .pac-select-wrap { position:relative; }
-      .pac-search-row { display:flex; gap:6px; }
-      .pac-suggestions, .pac-list-all { position:absolute; left:0; right:0; top:100%; background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:0 6px 16px rgba(0,0,0,.08); z-index:10; max-height:240px; overflow:auto; margin-top:6px; display:none; }
-      .pac-suggestions .item, .pac-list-all .item { display:flex; justify-content:space-between; padding:8px 10px; cursor:pointer; }
-      .pac-suggestions .item:hover, .pac-list-all .item:hover { background:#f3f6fb; }
-      .pac-suggestions .name .hl { background: #ffec99; }
-      .remove-btn { border:1px solid #e57373; background:#ffebee; border-radius:8px; padding:8px; cursor:pointer; }
-      .btn-outline { border:1px solid #90caf9; background:#e3f2fd; border-radius:8px; padding:8px 10px; cursor:pointer; }
-      .piece-total { margin-top:8px; padding-top:6px; border-top:1px dashed #ddd; color:#445; font-size:14px; }
-      .total-chip { display:inline-block; padding:6px 10px; border-radius:999px; background:#f2f7ff; border:1px solid #d6e3ff; margin-right:8px; }
-      .list-btn { border:1px solid #ccc; background:#fafafa; border-radius:8px; padding:8px; cursor:pointer; }
-      .btn-danger { border:1px solid #ef9a9a; background:#ffebee; border-radius:8px; padding:8px 10px; cursor:pointer; }
-      .muted { color:#6b7280; }
-    </style>
     <script>
         // Données matériels disponibles (depuis PHP)
         const pacData = <?= json_encode($pac_list, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) ?>;
@@ -835,7 +806,12 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 <?php require __DIR__ . '/inc/sidebar.php'; ?>
 
 <div class="main">
-    <h1>Devis - Factures - Bons de commandes <small id="source-badge" class="muted"></small></h1>
+    <div class="page-header">
+      <div>
+        <h1>Devis / Factures / BDC</h1>
+        <div class="subtitle">Creation et gestion de vos documents commerciaux <small id="source-badge"></small></div>
+      </div>
+    </div>
 
     <?php if ($copyBanner): ?>
       <div class="info"><?= $copyBanner ?></div>
@@ -850,8 +826,8 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
     <!-- ============== 1) PRÉPARATION DU DEVIS ============== -->
     <section id="prep" class="card">
-      <h2>🧾 Préparation du devis</h2>
-      <p class="muted" style="margin-top:-6px">Sélectionnez le client, ajoutez des pièces et des matériels, puis validez.</p>
+      <h2>Preparation du devis</h2>
+      <p class="muted">Sélectionnez le client, ajoutez des pièces et des matériels, puis validez.</p>
 
       <form id="form-devis" method="POST" action="traitement_devis.php" target="_blank" class="stack">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
@@ -881,21 +857,21 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
         <div class="pieces-toolbar">
           <button type="button" id="add-piece-btn" class="add-piece-btn">➕ Ajouter une pièce</button>
-          <span class="muted">Astuce : les quantités laissées vides seront prises comme <strong>1</strong> à l’enregistrement.</span>
+          <span class="muted">Astuce : les quantités laissées vides seront prises comme <strong>1</strong> à l'enregistrement.</span>
         </div>
 
         <div id="pieces-holder"><!-- pièces dynamiques --></div>
 
         <div class="grid-2-tight">
           <div>
-            <label for="date_echeance">Date d’échéance</label>
+            <label for="date_echeance">Date d'échéance</label>
             <input type="date" id="date_echeance" name="date_echeance" value="<?= date('Y-m-d', strtotime('+30 days')) ?>" required>
           </div>
 
           <div>
             <label>Paiement</label>
-            <div id="pay-block" class="card" style="padding:12px;">
-              <div style="display:grid;grid-template-columns: 1fr 160px 1fr; gap:10px; align-items:end;">
+            <div id="pay-block" class="card" style="padding:var(--gap-3);">
+              <div style="display:grid;grid-template-columns:1fr 160px 1fr;gap:var(--gap-2);align-items:end;">
                 <div>
                   <label for="mode_paiement_1">Mode de règlement</label>
                   <select id="mode_paiement_1" name="mode_paiement_1" required>
@@ -932,17 +908,17 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
           <span class="total-chip"><strong>Total TTC :</strong> <span id="total_ttc">0.00 €</span></span>
         </div>
 
-        <div class="inline" style="margin-top:6px;">
-          <button type="submit" class="btn btn-save">💾 Enregistrer le devis</button>
+        <div class="inline" style="margin-top:var(--gap-2);">
+          <button type="submit" class="btn btn-save">Enregistrer le devis</button>
           <a class="btn btn-secondary" href="devis.php">Réinitialiser</a>
         </div>
       </form>
     </section>
 
     <!-- ============== 2) DOCUMENTS : recherche & 10 derniers ============== -->
-    <section id="documents" class="card" style="margin-top:18px;">
-      <h2>📚 Documents</h2>
-      <p class="muted" style="margin-top:-6px">Retrouvez rapidement les derniers devis, bons de commande et factures. Utilisez la recherche par client.</p>
+    <section id="documents" class="card" style="margin-top:var(--gap-3);">
+      <h2>Documents recents</h2>
+      <p class="muted">Retrouvez rapidement les derniers devis, bons de commande et factures. Utilisez la recherche par client.</p>
 
       <form class="searchbar" method="get" action="#documents">
         <input type="text" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" placeholder="Recherche : nom, prénom ou téléphone du client">
@@ -950,10 +926,10 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
         <?php if ($q !== ''): ?><a class="btn btn-secondary" href="devis.php#documents">Réinitialiser</a><?php endif; ?>
       </form>
 
-      <div class="grid" style="grid-template-columns:1fr; gap:18px;">
+      <div class="cards">
         <!-- Devis -->
         <div class="card">
-          <h3>🧾 Devis <span class="pill">10 derniers</span> <span class="pill">Résultats: <?= (int)$cnt_devis ?></span></h3>
+          <h3>Devis <span class="pill">10 derniers</span> <span class="pill">Résultats: <?= (int)$cnt_devis ?></span></h3>
           <div class="table-wrap">
             <table class="table-docs">
               <thead>
@@ -994,7 +970,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
         <!-- Bons de commande -->
         <div class="card">
-          <h3>🧾 Bons de commande <span class="pill">10 derniers</span> <span class="pill">Résultats: <?= (int)$cnt_bdc ?></span></h3>
+          <h3>Bons de commande <span class="pill">10 derniers</span> <span class="pill">Résultats: <?= (int)$cnt_bdc ?></span></h3>
           <div class="table-wrap">
             <table class="table-docs">
               <thead>
@@ -1029,7 +1005,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
         <!-- Factures -->
         <div class="card">
-          <h3>🧾 Factures <span class="pill">10 dernières</span> <span class="pill">Résultats: <?= (int)$cnt_fac ?></span></h3>
+          <h3>Factures <span class="pill">10 dernières</span> <span class="pill">Résultats: <?= (int)$cnt_fac ?></span></h3>
           <div class="table-wrap">
             <table class="table-docs">
               <thead>

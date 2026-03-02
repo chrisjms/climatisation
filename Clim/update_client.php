@@ -73,7 +73,7 @@ if (!$client_row) {
     exit;
 }
 
-/* ───────── Normaliser/Sécuriser l’URL de retour ─────────
+/* ───────── Normaliser/Sécuriser l'URL de retour ─────────
    - On refuse toute URL externe (contient "://")
    - Si vide ou douteuse, on construit: clientele.php?client_id=ID#fiche&tab=coord
    - On s'assure que client_id est présent dans la query
@@ -208,7 +208,7 @@ if (is_array($emails_raw) || is_array($emails_lbl)) {
     }));
 }
 
-/* Si erreurs, on renvoie vers le même client + on ouvre l’éditeur */
+/* Si erreurs, on renvoie vers le même client + on ouvre l'éditeur */
 if ($errors) {
     // Forcer un retour propre avec edit=1
     $errRetour = $retour;

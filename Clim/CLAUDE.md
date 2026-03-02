@@ -2,10 +2,6 @@
 
 ## Project Overview
 
-A hotel website for Hôtel Corintel (Bordeaux, France) with two main parts:
-- **Client-facing site**: Public pages for guests (home, services, room service, activities, contact)
-- **Admin panel**: Dashboard for hotel staff to manage orders, messages, and content
-
 ## Tech Stack
 
 | Layer | Technology |
@@ -13,7 +9,6 @@ A hotel website for Hôtel Corintel (Bordeaux, France) with two main parts:
 | Backend | PHP (no framework) |
 | Frontend | HTML5, CSS3, Vanilla JavaScript |
 | Database | MySQL with PDO |
-| i18n | Custom JS-based system (4 languages: FR, EN, ES, IT) |
 
 **Do NOT introduce:**
 - PHP frameworks (Laravel, Symfony, etc.)

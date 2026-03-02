@@ -60,77 +60,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Connexion - Climatisation</title>
     <meta name="robots" content="noindex, nofollow">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 500px;
-            margin: 40px auto;
-            background: #f8f9fa;
-            padding: 20px 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        h2 { text-align: center; color: #333; }
-        label { font-weight: bold; }
-        input[type=text], input[type=password] {
-            width: 100%; padding: 8px; margin: 5px 0 15px 0;
-            border: 1px solid #ccc; border-radius: 5px;
-        }
-        button {
-            width: 100%; padding: 10px;
-            background: #007bff; color: #fff;
-            border: none; border-radius: 5px;
-            font-size: 16px; cursor: pointer;
-        }
-        button:hover { background: #0056b3; }
-        .success {
-            background: #d4edda; color: #155724;
-            padding: 10px; border-radius: 5px; margin-bottom: 15px;
-        }
-        .error {
-            background: #f8d7da; color: #721c24;
-            padding: 10px; border-radius: 5px; margin-bottom: 15px;
-        }
-        .links { margin-top: 16px; text-align: center; }
-        .links a { text-decoration: none; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h2>Connexion</h2>
+<div class="login-page">
+    <div class="login-card">
+        <div class="logo-area">
+            <?php if (file_exists(__DIR__ . '/assets/logo.jpeg')): ?>
+                <img src="assets/logo.jpeg" alt="Logo" width="48" height="48" style="margin:0 auto;border-radius:var(--r-sm);">
+            <?php endif; ?>
+            <h1>Climatisation</h1>
+            <p>Connectez-vous pour acceder a votre espace</p>
+        </div>
 
-    <?php if ($message): ?>
-        <div class="error"><?= h($message) ?></div>
-    <?php endif; ?>
+        <?php if ($message): ?>
+            <div class="error"><?= h($message) ?></div>
+        <?php endif; ?>
 
-    <form method="POST" action="" autocomplete="off">
-        <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
+        <form method="POST" action="" autocomplete="off">
+            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
 
-        <label for="username">Nom d'utilisateur :</label>
-        <input type="text" id="username" name="username" required value="<?= h($_POST['username'] ?? '') ?>">
+            <div class="form-group">
+                <label for="username">Nom d'utilisateur</label>
+                <input type="text" id="username" name="username" required
+                       value="<?= h($_POST['username'] ?? '') ?>"
+                       placeholder="Votre identifiant">
+            </div>
 
-        <label for="password">Mot de passe :</label>
-        <input type="password" id="password" name="password" required>
+            <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <div class="password-wrapper">
+                    <input type="password" id="password" name="password" required
+                           placeholder="Votre mot de passe">
+                    <button type="button" class="password-toggle" id="togglePwd" aria-label="Afficher le mot de passe">
+                        <svg id="eyeOpen" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg id="eyeClosed" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+                    </button>
+                </div>
+            </div>
 
-        <label>
-            <input type="checkbox" id="showpwd"> Afficher le mot de passe
-        </label>
-        <br><br>
+            <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;margin-top:8px;">Se connecter</button>
+        </form>
+    </div>
+</div>
 
-        <button type="submit">Se connecter</button>
-    </form>
-
-    <script>
-        (function(){
-            const toggle = document.getElementById('showpwd');
-            const pw = document.getElementById('password');
-            if (toggle && pw) {
-                toggle.addEventListener('change', function(){
-                    pw.type = this.checked ? 'text' : 'password';
-                });
-            }
-        })();
-    </script>
+<script>
+(function(){
+    const btn = document.getElementById('togglePwd');
+    const pw = document.getElementById('password');
+    const eyeOpen = document.getElementById('eyeOpen');
+    const eyeClosed = document.getElementById('eyeClosed');
+    if (btn && pw) {
+        btn.addEventListener('click', function(){
+            const show = pw.type === 'password';
+            pw.type = show ? 'text' : 'password';
+            eyeOpen.style.display = show ? 'none' : '';
+            eyeClosed.style.display = show ? '' : 'none';
+        });
+    }
+})();
+</script>
 </body>
 </html>

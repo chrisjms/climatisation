@@ -308,24 +308,18 @@ try {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="<?= e($_SESSION['csrf_token']) ?>">
 <link rel="stylesheet" href="style.css">
-<style>
-  /* Micro retouches spécifiques pour caler le look sur ajout_pac.php */
-  .stack { display:grid; gap:12px; }
-  .row-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-  @media (max-width: 860px){ .row-grid { grid-template-columns: 1fr; } }
-  .section-nav { position: sticky; top: 0; z-index: 5; background: linear-gradient(180deg, var(--bg), var(--bg-2)); padding: 8px 0 12px; margin: -8px 0 16px; border-bottom: 1px solid var(--bd); }
-  .card h2 { display:flex; align-items:center; gap:8px; }
-  .role-pill { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid #e3e7ee; background:#f7f9fc; border-radius:999px; font-weight:700; }
-  .help-list { margin:8px 0 0 0; padding-left:18px; color:#334155; }
-  .help-list li { margin:6px 0; }
-</style>
 </head>
 <body>
 
 <?php require __DIR__ . '/inc/sidebar.php'; ?>
 
 <div class="main">
-  <h1>Gestion des comptes</h1>
+  <div class="page-header">
+    <div>
+      <h1>Gestion des comptes</h1>
+      <div class="subtitle">Utilisateurs et droits d'acces</div>
+    </div>
+  </div>
 
   <?php if (!empty($_GET['msg'])): ?><div class="flash"><?= e($_GET['msg']) ?></div><?php endif; ?>
   <?php if (!empty($_GET['err'])): ?><div class="alert error"><?= e($_GET['err']) ?></div><?php endif; ?>
@@ -334,7 +328,7 @@ try {
   <div class="grid-2">
     <!-- 1) Création de compte (admin uniquement) -->
     <section id="create" class="card">
-      <h2>➕ Créer un compte</h2>
+      <h2>Creer un compte</h2>
       <p class="muted" style="margin-top:-6px">
         <?php if ($isAdmin): ?>
           Renseignez l'identifiant, un mot de passe et le rôle.
@@ -430,7 +424,7 @@ try {
       </form>
 
       <hr style="margin:14px 0;border:none;border-top:1px solid var(--bd);">
-      <h3 style="margin:0 0 6px;">ℹ️ Aide rapide</h3>
+      <h3 style="margin:0 0 6px;">Aide rapide</h3>
       <ul class="help-list">
         <li><span class="role-pill">Administrateur</span> : crée & supprime des comptes, change les rôles.</li>
         <li><span class="role-pill">Utilisateur</span> : peut seulement modifier son propre mot de passe.</li>
@@ -441,7 +435,7 @@ try {
 
   <!-- ====== Liste des comptes (sans colonne ID) ====== -->
   <section id="liste" class="card full" style="margin-top:18px;">
-    <h2>👥 Comptes existants</h2>
+    <h2>Comptes existants</h2>
     <div class="muted" style="margin-top:-6px">Filtrez par identifiant. Les actions avancées sont réservées aux administrateurs.</div>
 
     <form method="get" action="gestion_comptes.php" class="filter-bar inline" style="gap:10px; align-items:end; margin:14px 0;">

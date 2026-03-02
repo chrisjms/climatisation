@@ -169,9 +169,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
                 <div class="row">
                     <div>
-                        <label for="acompte">Montant d’acompte payé (optionnel)</label>
+                        <label for="acompte">Montant d'acompte payé (optionnel)</label>
                         <input type="text" id="acompte" name="acompte" value="<?= htmlspecialchars($prefill_acompte) ?>" placeholder="ex. 500,00">
-                        <small>Vous pouvez saisir “500,00” ou “500.00”.</small>
+                        <small>Vous pouvez saisir "500,00" ou "500.00".</small>
                     </div>
                     <div>
                         <label for="note_acompte">Note (facultatif)</label>
@@ -184,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             </form>
 
             <p class="muted" style="margin-top:10px">
-                La facture reprend l’affichage et la structure du devis (pièces, <u>sans sous-totaux par pièce</u>, etc.).<br>
+                La facture reprend l'affichage et la structure du devis (pièces, <u>sans sous-totaux par pièce</u>, etc.).<br>
                 Source&nbsp;: <strong><?= $src==='bdc' ? 'Bon de commande' : 'Devis' ?></strong>.
             </p>
         </div>

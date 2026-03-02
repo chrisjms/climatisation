@@ -300,7 +300,7 @@ try {
 
     // 2) Factures du client (si pas de FK cascade)
     if ($facture_ids) {
-        // Si vous avez d’autres tables liées aux factures, supprimez-les ici en amont.
+        // Si vous avez d'autres tables liées aux factures, supprimez-les ici en amont.
         $stmt = $pdo->prepare('DELETE FROM factures WHERE client_id = ?');
         $stmt->execute([$client_id]);
     }

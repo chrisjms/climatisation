@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'upload' || $action ==
     $csrf = $_POST['csrf'] ?? '';
     if (!hash_equals($_SESSION['csrf_token'], $csrf)) {
         http_response_code(403);
-        exit('Jeton CSRF invalide pour l’upload.');
+        exit('Jeton CSRF invalide pour l'upload.');
     }
 
     $titre       = trim($_POST['titre'] ?? '');
@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'upload' || $action ==
         $file = $_FILES['brochure'];
 
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            $errors[] = "Erreur d’upload (code {$file['error']}).";
+            $errors[] = "Erreur d'upload (code {$file['error']}).";
         } else {
             // Validation basique
             $maxSize = 30 * 1024 * 1024; // 30 Mo
@@ -168,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update_desc') {
     $stmt = $pdo->prepare("UPDATE brochures SET description = :d WHERE id = :id");
     $stmt->execute([':d' => ($newDesc === '' ? null : $newDesc), ':id' => $idPost]);
 
-    // Conserver filtres/tri dans l’URL
+    // Conserver filtres/tri dans l'URL
     $back = array_intersect_key($_GET, ['q'=>1,'from'=>1,'to'=>1,'sort'=>1]);
     $back['msg'] = 'Description mise à jour.';
     $qs = http_build_query($back);
@@ -225,22 +225,18 @@ $countRows = count($rows);
   <title>Brochures — Gestion</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
-  <style>
-    /* Micro retouches de mise en page de cette page */
-    .section-nav { position: sticky; top: 0; z-index: 5; background: linear-gradient(180deg, var(--bg), var(--bg-2)); padding: 8px 0 12px; margin: -8px 0 16px; border-bottom: 1px solid var(--bd); }
-    .stack { display: grid; gap: 12px; }
-    .cards-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    @media (max-width: 960px){ .cards-2 { grid-template-columns: 1fr; } }
-    .table-wrap { margin-top: 10px; }
-    .file-pills { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  </style>
 </head>
 <body>
 
 <?php require __DIR__ . '/inc/sidebar.php'; ?>
 
 <div class="main">
-  <h1>Brochures</h1>
+  <div class="page-header">
+    <div>
+      <h1>Brochures</h1>
+      <div class="subtitle">Documents, catalogues et fichiers</div>
+    </div>
+  </div>
 
   <?php if (!empty($message)): ?>
     <div class="flash"><?= h($message) ?></div>
@@ -259,7 +255,7 @@ $countRows = count($rows);
 
     <!-- ───────────── 1) Ajout d'une brochure ───────────── -->
     <section id="upload" class="card">
-      <h2>➕ Ajouter une brochure</h2>
+      <h2>Ajouter une brochure</h2>
       <p class="muted" style="margin-top:-6px">Formats acceptés : PDF, JPG, PNG, WEBP, DOCX, PPTX — 30&nbsp;Mo max.</p>
 
       <form method="post" enctype="multipart/form-data" action="brochures.php?action=upload" class="stack">
@@ -297,7 +293,7 @@ $countRows = count($rows);
     <!-- ───────────── 2) Filtres / tri ───────────── -->
     <section id="filtres" class="card">
       <h2>🔎 Filtres & tri</h2>
-      <p class="muted" style="margin-top:-6px">Affinez l’affichage par mots-clés et dates, puis choisissez l’ordre de tri.</p>
+      <p class="muted" style="margin-top:-6px">Affinez l'affichage par mots-clés et dates, puis choisissez l'ordre de tri.</p>
 
       <form method="get" class="stack">
         <div>
@@ -341,7 +337,7 @@ $countRows = count($rows);
 
   <!-- ───────────── 3) Listing ───────────── -->
   <section id="listing" class="card" style="margin-top:18px;">
-    <h2>📚 Brochures enregistrées</h2>
+    <h2>Brochures enregistrees</h2>
     <div class="file-pills muted" style="margin-top:-6px">
       <span class="pill">Résultats : <strong><?= (int)$countRows ?></strong></span>
       <?php if ($q !== ''): ?><span class="pill">Recherche : "<?= h($q) ?>"</span><?php endif; ?>

@@ -152,24 +152,18 @@ foreach ($pac_list as $row) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="<?= e($_SESSION['csrf_token']) ?>">
 <link rel="stylesheet" href="style.css">
-<style>
-  /* Micro retouches d’affichage spécifiques à cette page */
-  .section-nav { position: sticky; top: 0; z-index: 5; background: linear-gradient(180deg, var(--bg), var(--bg-2)); padding: 8px 0 12px; margin: -8px 0 16px; border-bottom: 1px solid var(--bd); }
-  .section-nav .pill { font-weight: 700; }
-  .stack { display: grid; gap: 12px; }
-  .row-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-  .pac-table td.action-links a { margin-right: 10px; }
-  .cat-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--bd); border-radius:999px; background:#f7f9fc; margin:4px 6px; }
-  .cat-chip a { text-decoration:none; }
-  .card h3, .card h2 { display:flex; align-items:center; gap:8px; }
-</style>
 </head>
 <body class="noselect">
 <?php require __DIR__ . '/inc/sidebar.php'; ?>
 
 <div class="main">
 
-  <h1>Gestion du matériel</h1>
+  <div class="page-header">
+    <div>
+      <h1>Gestion du materiel</h1>
+      <div class="subtitle">Equipements, categories et tarifs</div>
+    </div>
+  </div>
 
   <?php if ($message): ?>
     <div class="flash"><?= e($message) ?></div>
@@ -180,7 +174,7 @@ foreach ($pac_list as $row) {
 
     <!-- ============ 1) AJOUTER / MODIFIER UN MATERIEL ============ -->
     <section id="ajout" class="card">
-      <h2><?= $edit_pac ? '✏️ Modifier un matériel' : '➕ Ajouter un matériel' ?></h2>
+      <h2><?= $edit_pac ? 'Modifier un materiel' : 'Ajouter un materiel' ?></h2>
       <p class="muted" style="margin-top:-6px">Renseignez le nom, un descriptif (facultatif), le prix HT et, si besoin, sa catégorie.</p>
 
       <form method="POST" action="ajout_pac.php" class="stack">
@@ -229,12 +223,12 @@ foreach ($pac_list as $row) {
 
     <!-- ============ 2) CATEGORIES ============ -->
     <section id="categories" class="card">
-      <h2>🗂️ Catégories</h2>
-      <p class="muted" style="margin-top:-6px">Organisez vos matériels par catégories. Le tri (▲▼) change l’ordre d’affichage.</p>
+      <h2>Categories</h2>
+      <p class="muted" style="margin-top:-6px">Organisez vos matériels par catégories. Le tri (▲▼) change l'ordre d'affichage.</p>
 
       <div class="grid" style="grid-template-columns:1fr; gap:14px;">
         <div class="card" style="padding:12px;">
-          <h3>➕ Nouvelle catégorie</h3>
+          <h3>Nouvelle categorie</h3>
           <form method="POST" action="ajout_pac.php" class="inline" style="margin-top:8px;">
             <input type="hidden" name="action" value="add_cat">
             <input type="text" name="cat_name" placeholder="Nom de la catégorie…" required style="flex:1;">
@@ -243,7 +237,7 @@ foreach ($pac_list as $row) {
         </div>
 
         <div class="card" style="padding:12px;">
-          <h3>✏️ Renommer une catégorie</h3>
+          <h3>Renommer une categorie</h3>
           <form method="POST" action="ajout_pac.php" class="inline" style="margin-top:8px; gap:8px;">
             <input type="hidden" name="action" value="rename_cat">
             <select name="cat_id" required style="flex:1; min-width:180px;">
@@ -280,7 +274,7 @@ foreach ($pac_list as $row) {
   <!-- ============ 3) LISTE DES MATERIELS ============ -->
   <section id="liste" class="card full" style="margin-top:18px;">
     <h2>📦 Matériels enregistrés</h2>
-    <div class="muted" style="margin-top:-6px">Filtrez, puis réordonnez les éléments par glisser-déposer (☰) à l’intérieur d’une même catégorie.</div>
+    <div class="muted" style="margin-top:-6px">Filtrez, puis réordonnez les éléments par glisser-déposer (☰) à l'intérieur d'une même catégorie.</div>
 
     <form method="get" action="ajout_pac.php" class="filter-bar inline" style="gap:10px; align-items:end; margin:14px 0;">
       <div style="min-width:240px;">

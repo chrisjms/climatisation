@@ -19,7 +19,7 @@ function trunc(?string $s, int $len): ?string {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Champs “fiche”
+    // Champs "fiche"
     $nom         = trim($_POST['nom'] ?? '');
     $prenom      = trim($_POST['prenom'] ?? '');
     $adresse     = trim($_POST['adresse'] ?? '');
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->beginTransaction();
 
-        // Insert client (conserve les champs “compat”)
+        // Insert client (conserve les champs "compat")
         $stmt = $pdo->prepare('
             INSERT INTO clients (nom, prenom, telephone, email, adresse, code_postal, ville, details, date_ajout)
             VALUES (:nom, :prenom, :telephone, :email, :adresse, :code_postal, :ville, :details, :date_ajout)
@@ -160,16 +160,26 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ajouter un client - Climatisation</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <?php require __DIR__ . '/inc/sidebar.php'; ?>
 
-
 <div class="main">
+    <div class="page-header">
+        <div>
+            <h1>Nouveau client</h1>
+            <div class="subtitle">Renseignez les informations du client</div>
+        </div>
+        <div class="actions">
+            <a href="<?= htmlspecialchars($retour, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Retour</a>
+        </div>
+    </div>
+
     <div class="card">
-        <h2>Ajouter un nouveau client</h2>
+        <h2>Informations du client</h2>
 
         <?php if ($message): ?>
             <div class="info"><?= $message ?></div>
@@ -229,7 +239,7 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
                         </div>
                         <div class="toolbar">
                             <button type="button" class="btn btn-add" onclick="addEmail()">➕ Ajouter un email</button>
-                            <span class="hint">Vous pouvez laisser vide si vous n’avez pas d’email.</span>
+                            <span class="hint">Vous pouvez laisser vide si vous n'avez pas d'email.</span>
                         </div>
                     </div>
 
@@ -300,7 +310,7 @@ function removeRow(btn){
     if (wrap && wrap.id === 'phones-wrapper'  && wrap.children.length === 0) addPhone(true);
     if (wrap && wrap.id === 'emails-wrapper'  && wrap.children.length === 0) addEmail(true);
 
-    // Masquer l’icône poubelle de la 1ère ligne
+    // Masquer l'icône poubelle de la 1ère ligne
     refreshTrashVisibility('phones-wrapper','phone-row');
     refreshTrashVisibility('emails-wrapper','email-row');
 }

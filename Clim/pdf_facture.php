@@ -12,7 +12,7 @@ function generer_pdf_facture(int $facture_id, string $numero, bool $hideDueDate 
     // $pdf->Write(..., "Facture n° $numero");
     // $pdf->Write(..., "Date : ".date('d/m/Y', strtotime($facture['date_creation'])));
 
-    // Pas d’échéance si $hideDueDate === true
+    // Pas d'échéance si $hideDueDate === true
     // if (!$hideDueDate && !empty($facture['date_echeance'])) {
     //     $pdf->Write(..., "Échéance : ".date('d/m/Y', strtotime($facture['date_echeance'])));
     // }
