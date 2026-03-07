@@ -165,9 +165,7 @@ foreach ($pac_list as $row) {
     </div>
   </div>
 
-  <?php if ($message): ?>
-    <div class="flash"><?= e($message) ?></div>
-  <?php endif; ?>
+  <?php $toastMsg = $message; ?>
 
   <!-- Bloc 1 & 2 côte à côte : Ajouter / Catégories -->
   <div class="grid-2">
@@ -175,7 +173,7 @@ foreach ($pac_list as $row) {
     <!-- ============ 1) AJOUTER / MODIFIER UN MATERIEL ============ -->
     <section id="ajout" class="card">
       <h2><?= $edit_pac ? 'Modifier un materiel' : 'Ajouter un materiel' ?></h2>
-      <p class="muted" style="margin-top:-6px">Renseignez le nom, un descriptif (facultatif), le prix HT et, si besoin, sa catégorie.</p>
+      <p class="muted">Renseignez le nom, un descriptif (facultatif), le prix HT et, si besoin, sa catégorie.</p>
 
       <form method="POST" action="ajout_pac.php" class="stack">
         <input type="hidden" name="action" value="save_pac">
@@ -193,7 +191,7 @@ foreach ($pac_list as $row) {
           <textarea id="description" name="description" rows="4"><?= e($edit_pac['description'] ?? '') ?></textarea>
         </div>
 
-        <div class="row-grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
+        <div class="row-grid">
           <div>
             <label for="prix">Prix (€)</label>
             <input id="prix" type="number" name="prix" step="0.01" value="<?= e($edit_pac['prix'] ?? '') ?>" required>
@@ -212,7 +210,7 @@ foreach ($pac_list as $row) {
           </div>
         </div>
 
-        <div class="inline" style="margin-top:4px;">
+        <div class="inline">
           <button type="submit" class="btn btn-save"><?= $edit_pac ? 'Enregistrer les modifications' : 'Ajouter le matériel' ?></button>
           <?php if ($edit_pac): ?>
             <a class="btn btn-secondary" href="ajout_pac.php">Annuler</a>
@@ -224,35 +222,36 @@ foreach ($pac_list as $row) {
     <!-- ============ 2) CATEGORIES ============ -->
     <section id="categories" class="card">
       <h2>Categories</h2>
-      <p class="muted" style="margin-top:-6px">Organisez vos matériels par catégories. Le tri (▲▼) change l'ordre d'affichage.</p>
+      <p class="muted">Organisez vos matériels par catégories. Le tri (▲▼) change l'ordre d'affichage.</p>
 
-      <div class="grid" style="grid-template-columns:1fr; gap:14px;">
-        <div class="card" style="padding:12px;">
+      <div class="stack">
+        <div class="card">
           <h3>Nouvelle categorie</h3>
-          <form method="POST" action="ajout_pac.php" class="inline" style="margin-top:8px;">
+          <form method="POST" action="ajout_pac.php" class="inline">
             <input type="hidden" name="action" value="add_cat">
-            <input type="text" name="cat_name" placeholder="Nom de la catégorie…" required style="flex:1;">
+            <input type="text" name="cat_name" placeholder="Nom de la catégorie…" required>
             <button type="submit" class="btn btn-primary">Ajouter</button>
           </form>
         </div>
 
-        <div class="card" style="padding:12px;">
+        <div class="card">
           <h3>Renommer une categorie</h3>
-          <form method="POST" action="ajout_pac.php" class="inline" style="margin-top:8px; gap:8px;">
+          <form method="POST" action="ajout_pac.php" class="inline">
             <input type="hidden" name="action" value="rename_cat">
-            <select name="cat_id" required style="flex:1; min-width:180px;">
+            <select name="cat_id" required>
               <option value="">— Choisir —</option>
               <?php foreach ($categories as $cat): ?>
                 <option value="<?= (int)$cat['id'] ?>"><?= e($cat['nom']) ?></option>
               <?php endforeach; ?>
             </select>
-            <input type="text" name="cat_name" placeholder="Nouveau nom…" required style="flex:1;">
+            <input type="text" name="cat_name" placeholder="Nouveau nom…" required>
             <button type="submit" class="btn">Renommer</button>
           </form>
         </div>
       </div>
 
-      <div style="margin-top:10px;">
+      <hr>
+      <div>
         <?php if ($categories): ?>
           <?php foreach ($categories as $cat): ?>
             <span class="cat-chip">
@@ -260,7 +259,7 @@ foreach ($pac_list as $row) {
               <a class="muted" href="ajout_pac.php?move_cat=up&cat_id=<?= (int)$cat['id'] ?>" title="Monter">▲</a>
               <a class="muted" href="ajout_pac.php?move_cat=down&cat_id=<?= (int)$cat['id'] ?>" title="Descendre">▼</a>
               <a class="muted" href="ajout_pac.php?delete_cat=<?= (int)$cat['id'] ?>"
-                 onclick="return confirm('Supprimer cette catégorie ? Les matériels seront détachés (Aucune).')">🗑</a>
+                 onclick="event.preventDefault(); var u=this.href; confirmAction('Supprimer cette categorie ? Les materiels seront detaches (Aucune).', function(){ location.href=u; }, {title:'Suppression', confirmText:'Supprimer', danger:true})">Suppr.</a>
             </span>
           <?php endforeach; ?>
         <?php else: ?>
@@ -272,13 +271,13 @@ foreach ($pac_list as $row) {
   </div><!-- /grid-2 -->
 
   <!-- ============ 3) LISTE DES MATERIELS ============ -->
-  <section id="liste" class="card full" style="margin-top:18px;">
-    <h2>📦 Matériels enregistrés</h2>
-    <div class="muted" style="margin-top:-6px">Filtrez, puis réordonnez les éléments par glisser-déposer (☰) à l'intérieur d'une même catégorie.</div>
+  <section id="liste" class="card full mt-3">
+    <h2>Materiels enregistres</h2>
+    <div class="muted">Filtrez, puis réordonnez les éléments par glisser-déposer (☰) à l'intérieur d'une même catégorie.</div>
 
-    <form method="get" action="ajout_pac.php" class="filter-bar inline" style="gap:10px; align-items:end; margin:14px 0;">
-      <div style="min-width:240px;">
-        <label for="f-cat" class="muted" style="margin:0 0 4px; font-weight:600;">Catégorie</label>
+    <form method="get" action="ajout_pac.php" class="filter-bar">
+      <div class="form-group">
+        <label for="f-cat">Catégorie</label>
         <select id="f-cat" name="cat">
           <option value="">— Toutes catégories —</option>
           <?php foreach ($categories as $cat): ?>
@@ -288,8 +287,8 @@ foreach ($pac_list as $row) {
           <?php endforeach; ?>
         </select>
       </div>
-      <div class="spacer" style="max-width:420px;">
-        <label for="f-search" class="muted" style="margin:0 0 4px; font-weight:600;">Recherche</label>
+      <div class="form-group">
+        <label for="f-search">Recherche</label>
         <input id="f-search" type="text" name="search" placeholder="Nom ou description…" value="<?= e($search) ?>">
       </div>
       <button type="submit" class="btn btn-primary">Filtrer</button>
@@ -315,11 +314,11 @@ foreach ($pac_list as $row) {
             <table class="pac-table table-sticky">
               <thead>
               <tr>
-                <th style="width:42px;"></th>
+                <th class="col-drag"></th>
                 <th>Nom</th>
                 <th>Description</th>
-                <th style="width:140px;">Prix (€)</th>
-                <th style="width:180px;">Actions</th>
+                <th class="col-price">Prix (€)</th>
+                <th class="col-actions">Actions</th>
               </tr>
               </thead>
               <tbody class="pac-tbody" data-cat="<?= e($g['cat_id']) ?>">
@@ -332,9 +331,9 @@ foreach ($pac_list as $row) {
                   <td class="muted"><?= nl2br(e($pac['description'])) ?></td>
                   <td><span class="pill nowrap"><?= number_format((float)$pac['prix'], 2, ',', ' ') ?></span></td>
                   <td class="action-links">
-                    <a class="btn btn-secondary" href="ajout_pac.php?edit=<?= (int)$pac['id'] ?><?= $catFilter !== null ? '&cat='.(int)$catFilter : '' ?>">✏ Modifier</a>
+                    <a class="btn btn-secondary" href="ajout_pac.php?edit=<?= (int)$pac['id'] ?><?= $catFilter !== null ? '&cat='.(int)$catFilter : '' ?>">Modifier</a>
                     <a class="btn btn-danger" href="ajout_pac.php?supprimer=<?= (int)$pac['id'] ?><?= $catFilter !== null ? '&cat='.(int)$catFilter : '' ?>"
-                       onclick="return confirm('Confirmer la suppression ?')">🗑 Supprimer</a>
+                       onclick="event.preventDefault(); var u=this.href; confirmAction('Confirmer la suppression de ce materiel ?', function(){ location.href=u; }, {title:'Suppression', confirmText:'Supprimer', danger:true})">Supprimer</a>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -508,5 +507,7 @@ foreach ($pac_list as $row) {
   });
 })();
 </script>
+<?php require __DIR__ . '/inc/toast.php'; ?>
+<?php require __DIR__ . '/inc/modal.php'; ?>
 </body>
 </html>

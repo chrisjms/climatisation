@@ -170,6 +170,7 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
 <div class="main">
     <div class="page-header">
         <div>
+            <div class="breadcrumb"><a href="clientele.php">Clientele</a><span class="sep">&#8250;</span><span class="current">Nouveau client</span></div>
             <h1>Nouveau client</h1>
             <div class="subtitle">Renseignez les informations du client</div>
         </div>
@@ -181,11 +182,9 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
     <div class="card">
         <h2>Informations du client</h2>
 
-        <?php if ($message): ?>
-            <div class="info"><?= $message ?></div>
-        <?php endif; ?>
+        <?php $toastMsg = $message; ?>
 
-        <form method="POST" action="ajout_client.php?retour=<?= urlencode($retour) ?>">
+        <form id="form-ajout-client" method="POST" action="ajout_client.php?retour=<?= urlencode($retour) ?>">
             <input type="hidden" name="retour" value="<?= e($retour) ?>">
 
             <div class="grid-2">
@@ -207,12 +206,12 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
                             <div class="row-grid phone-row">
                                 <input type="text" name="telephone[]" value="<?= e($v) ?>" placeholder="+33 6 12 34 56 78">
                                 <input type="text" name="tel_label[]" value="<?= e($lab) ?>" placeholder="Libellé (Pro, Perso…)">
-                                <button type="button" class="trash" onclick="removeRow(this)">🗑</button>
+                                <button type="button" class="trash" onclick="removeRow(this)">Suppr.</button>
                             </div>
                             <?php endforeach; ?>
                         </div>
                         <div class="toolbar">
-                            <button type="button" class="btn btn-add" onclick="addPhone()">➕ Ajouter un téléphone</button>
+                            <button type="button" class="btn btn-add" onclick="addPhone()">+ Ajouter un telephone</button>
                             <span class="hint">Le premier numéro sera utilisé comme « téléphone principal ».</span>
                         </div>
                     </div>
@@ -233,24 +232,24 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
                             <div class="row-grid email-row">
                                 <input type="email" name="email[]" value="<?= e($m) ?>" placeholder="exemple@mail.com">
                                 <input type="text" name="email_label[]" value="<?= e($ml) ?>" placeholder="Libellé (Pro, Perso…)">
-                                <button type="button" class="trash" onclick="removeRow(this)">🗑</button>
+                                <button type="button" class="trash" onclick="removeRow(this)">Suppr.</button>
                             </div>
                             <?php endforeach; ?>
                         </div>
                         <div class="toolbar">
-                            <button type="button" class="btn btn-add" onclick="addEmail()">➕ Ajouter un email</button>
+                            <button type="button" class="btn btn-add" onclick="addEmail()">+ Ajouter un email</button>
                             <span class="hint">Vous pouvez laisser vide si vous n'avez pas d'email.</span>
                         </div>
                     </div>
 
                     <!-- Date + Bouton -->
-                    <div class="section" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center">
+                    <div class="section form-row-inline">
                         <label for="date_ajout">Date d'ajout :</label>
                         <input type="date" id="date_ajout" name="date_ajout" value="<?= $default_date_value ?>">
                     </div>
 
                     <div>
-                        <button type="submit" class="btn btn-save">✔ Ajouter</button>
+                        <button type="submit" class="btn btn-save">Ajouter</button>
                     </div>
                 </div>
 
@@ -277,7 +276,7 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
                                 <label for="adresse">Adresse :</label>
                                 <textarea id="adresse" name="adresse" rows="3"><?= e($_POST['adresse'] ?? '') ?></textarea>
                             </div>
-                            <div style="display:grid;grid-template-columns:180px 1fr;gap:12px">
+                            <div class="address-grid">
                                 <div>
                                     <label for="code_postal">Code postal :</label>
                                     <input type="text" id="code_postal" name="code_postal" value="<?= e($_POST['code_postal'] ?? '') ?>">
@@ -325,7 +324,7 @@ function addPhone(){
     el.innerHTML = `
         <input type="text" name="telephone[]" placeholder="+33 6 12 34 56 78">
         <input type="text" name="tel_label[]" placeholder="Libellé (Pro, Perso…)">
-        <button type="button" class="trash" onclick="removeRow(this)">🗑</button>
+        <button type="button" class="trash" onclick="removeRow(this)">Suppr.</button>
     `;
     wrap.appendChild(el);
     refreshTrashVisibility('phones-wrapper','phone-row');
@@ -337,7 +336,7 @@ function addEmail(){
     el.innerHTML = `
         <input type="email" name="email[]" placeholder="exemple@mail.com">
         <input type="text" name="email_label[]" placeholder="Libellé (Pro, Perso…)">
-        <button type="button" class="trash" onclick="removeRow(this)">🗑</button>
+        <button type="button" class="trash" onclick="removeRow(this)">Suppr.</button>
     `;
     wrap.appendChild(el);
     refreshTrashVisibility('emails-wrapper','email-row');
@@ -347,5 +346,21 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshTrashVisibility('emails-wrapper','email-row');
 });
 </script>
+<script>
+(function(){
+  var dirty = false;
+  var form = document.getElementById('form-ajout-client');
+  if (!form) return;
+  form.addEventListener('input', function(){ dirty = true; });
+  form.addEventListener('change', function(){ dirty = true; });
+  form.addEventListener('submit', function(){ dirty = false; });
+  window.addEventListener('beforeunload', function(e){
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+})();
+</script>
+<?php require __DIR__ . '/inc/toast.php'; ?>
 </body>
 </html>

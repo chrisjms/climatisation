@@ -3,16 +3,6 @@
 // Compatible avec vos pages existantes (clients, devis, factures, matériels, brochures)
 // et tolérant aux schémas de BDD variés (auto-détection colonnes).
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-
-echo "DEBUG START<br>";
-// --- Debug (à retirer en prod)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 // --- Auth & PDO
 require 'auth.php';
 require 'config.php';
@@ -42,6 +32,50 @@ function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function eur($n){ if ($n===null || $n==='') return '—'; return number_format((float)$n, 2, ',', ' ').' €'; }
 function ymd($d){ if(!$d) return ''; $ts = strtotime($d); return $ts? date('Y-m-d', $ts): (string)$d; }
 function dmy($d){ if(!$d) return ''; $ts = strtotime($d); return $ts? date('d/m/Y', $ts): (string)$d; }
+
+/* Mini sparkline/bar SVG generators */
+$_sparkId = 0;
+function sparkline(array $values, int $w = 120, int $h = 32, string $color = 'var(--success)'): string {
+    global $_sparkId;
+    if (count($values) < 2) return '';
+    $max = max($values); $min = min($values);
+    $range = $max - $min ?: 1;
+    $pad = 2; $pw = $w - $pad * 2; $ph = $h - $pad * 2;
+    $step = $pw / (count($values) - 1);
+    $pts = [];
+    foreach ($values as $i => $v) {
+        $x = round($pad + $i * $step, 1);
+        $y = round($pad + $ph - (($v - $min) / $range * $ph), 1);
+        $pts[] = "$x,$y";
+    }
+    $poly = implode(' ', $pts);
+    $gid = 'sg' . (++$_sparkId);
+    $lx = round($pad + (count($values) - 1) * $step, 1);
+    return '<svg class="sparkline" viewBox="0 0 '.$w.' '.$h.'" xmlns="http://www.w3.org/2000/svg">'
+         . '<defs><linearGradient id="'.$gid.'" x1="0" y1="0" x2="0" y2="1">'
+         . '<stop offset="0%" stop-color="'.$color.'" stop-opacity=".18"/>'
+         . '<stop offset="100%" stop-color="'.$color.'" stop-opacity=".01"/>'
+         . '</linearGradient></defs>'
+         . '<polygon points="'.$pad.','.($h-$pad).' '.$poly.' '.$lx.','.($h-$pad).'" fill="url(#'.$gid.')"/>'
+         . '<polyline points="'.$poly.'" fill="none" stroke="'.$color.'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+         . '</svg>';
+}
+function sparkbars(array $values, int $w = 120, int $h = 32, string $color = 'var(--success)'): string {
+    $n = count($values);
+    if ($n < 1) return '';
+    $max = max($values) ?: 1;
+    $pad = 2; $gap = 2;
+    $bw = max(2, ($w - 2 * $pad - ($n - 1) * $gap) / $n);
+    $ph = $h - 2 * $pad;
+    $bars = '';
+    foreach ($values as $i => $v) {
+        $x = round($pad + $i * ($bw + $gap), 1);
+        $bh = round(max(2, ($v / $max) * $ph), 1);
+        $y = round($pad + $ph - $bh, 1);
+        $bars .= '<rect x="'.$x.'" y="'.$y.'" width="'.round($bw,1).'" height="'.$bh.'" rx="1" fill="'.$color.'" opacity=".45"/>';
+    }
+    return '<svg class="sparkline" viewBox="0 0 '.$w.' '.$h.'" xmlns="http://www.w3.org/2000/svg">'.$bars.'</svg>';
+}
 
 $today      = date('Y-m-d');
 $firstMonth = date('Y-m-01');
@@ -326,34 +360,48 @@ if ($hasFact) {
             <div class="stat-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
-            <div class="stat-label">Clients</div>
-            <div class="stat-value"><?= (int)$nbClients ?></div>
-            <div class="stat-sub">Total en base</div>
+            <div>
+                <div class="stat-label">Clients</div>
+                <div class="stat-value" data-count="<?= (int)$nbClients ?>" data-format="int"><?= (int)$nbClients ?></div>
+                <div class="stat-sub">Total en base</div>
+            </div>
         </div>
         <div class="stat-card green">
             <div class="stat-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
             </div>
-            <div class="stat-label">CA du mois (TTC)</div>
-            <div class="stat-value"><?= eur($caMonth) ?></div>
-            <div class="stat-sub"><?= dmy($firstMonth) ?> &rarr; <?= dmy($today) ?></div>
+            <div>
+                <div class="stat-label">CA du mois (TTC)</div>
+                <div class="stat-value" data-count="<?= (float)$caMonth ?>" data-format="eur"><?= eur($caMonth) ?></div>
+                <div class="stat-sub"><?= dmy($firstMonth) ?> &rarr; <?= dmy($today) ?></div>
+                <?php if (!empty($caMonths) && count($caMonths) >= 2): ?>
+                  <?= sparkline(array_column($caMonths, 'total')) ?>
+                <?php endif; ?>
+            </div>
         </div>
         <div class="stat-card green">
             <div class="stat-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
             </div>
-            <div class="stat-label">CA annuel (TTC)</div>
-            <div class="stat-value"><?= eur($caYear) ?></div>
-            <div class="stat-sub">Depuis le 01/01</div>
+            <div>
+                <div class="stat-label">CA annuel (TTC)</div>
+                <div class="stat-value" data-count="<?= (float)$caYear ?>" data-format="eur"><?= eur($caYear) ?></div>
+                <div class="stat-sub">Depuis le 01/01</div>
+                <?php if (!empty($caMonths) && count($caMonths) >= 2): ?>
+                  <?= sparkbars(array_column($caMonths, 'total')) ?>
+                <?php endif; ?>
+            </div>
         </div>
         <?php if ($impayes !== null): ?>
         <div class="stat-card <?= $impayes > 0 ? 'orange' : 'green' ?>">
             <div class="stat-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
             </div>
-            <div class="stat-label">Impayes</div>
-            <div class="stat-value"><?= eur($impayes) ?></div>
-            <div class="stat-sub">Factures en attente</div>
+            <div>
+                <div class="stat-label">Impayes</div>
+                <div class="stat-value" data-count="<?= (float)$impayes ?>" data-format="eur"><?= eur($impayes) ?></div>
+                <div class="stat-sub">Factures en attente</div>
+            </div>
         </div>
         <?php endif; ?>
     </div>
@@ -362,31 +410,35 @@ if ($hasFact) {
     <div class="dashboard-grid">
 
         <!-- Left column -->
-        <div class="card" style="padding:0;overflow:hidden;">
-            <div class="card-section">
+        <div class="dashboard-col">
+
+            <!-- Activity feed -->
+            <div class="card">
                 <h3>Activite recente</h3>
                 <?php if (!$activite): ?>
-                    <p class="muted">Aucune activite recente.</p>
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                        <p>Aucune activite recente</p>
+                        <a href="devis.php#form-devis" class="btn btn-primary">Creer un devis</a>
+                    </div>
                 <?php else: ?>
                     <ul class="activity-list">
                         <?php foreach ($activite as $a):
                             $badgeClass = match($a['type']) {
-                                'Client' => '',
-                                'Devis' => 'warning',
-                                'Devis' => 'success',
+                                'Client'   => '',
+                                'Devis'    => 'warning',
+                                'Facture'  => 'success',
                                 'Brochure' => 'neutral',
-                                default => ''
+                                default    => ''
                             };
                         ?>
                             <li>
                                 <span>
-                                    <span class="badge <?= $badgeClass ?>">
-    <?= h($a['type']) ?>
-</span>
+                                    <span class="badge <?= $badgeClass ?>"><?= h($a['type']) ?></span>
                                     &nbsp;<?= h($a['label']) ?>
                                 </span>
-                                <span class="muted mono" style="display:flex;align-items:center;gap:8px;">
-                                    <?= dmy($a['date']) ?>
+                                <span class="muted mono activity-meta">
+                                    <span data-date="<?= date('Y-m-d', strtotime($a['date'])) ?>"><?= dmy($a['date']) ?></span>
                                     <?php if (!empty($a['url'])): ?>
                                         <a class="btn btn-sm" href="<?= h($a['url']) ?>">Ouvrir</a>
                                     <?php endif; ?>
@@ -397,11 +449,12 @@ if ($hasFact) {
                 <?php endif; ?>
             </div>
 
-            <div class="card-section">
+            <!-- Recent quotes -->
+            <div class="card">
                 <h3>Derniers devis (TTC)</h3>
                 <?php if ($derniersDevis): ?>
                     <table class="compact">
-                        <thead><tr><th>Client</th><th>Date</th><th style="text-align:right">Montant</th><th>PDF</th></tr></thead>
+                        <thead><tr><th>Client</th><th>Date</th><th class="text-right">Montant</th><th>PDF</th></tr></thead>
                         <tbody>
                         <?php foreach ($derniersDevis as $d):
                             $fileName = basename($d['fichier_pdf'] ?? '');
@@ -410,23 +463,28 @@ if ($hasFact) {
                         ?>
                             <tr>
                                 <td><?= h(trim(($d['nom'] ?? '') . ' ' . ($d['prenom'] ?? ''))) ?></td>
-                                <td class="mono"><?= dmy($d['date_creation'] ?? '') ?></td>
-                                <td class="mono" style="text-align:right"><?= eur($d['prix'] ?? null) ?></td>
+                                <td class="mono" data-date="<?= date('Y-m-d', strtotime($d['date_creation'] ?? 'now')) ?>"><?= dmy($d['date_creation'] ?? '') ?></td>
+                                <td class="mono text-right"><?= eur($d['prix'] ?? null) ?></td>
                                 <td><?= $hasFile ? '<a href="'.h($url).'" target="_blank">Ouvrir</a>' : '<span class="muted">—</span>' ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
                 <?php else: ?>
-                    <p class="muted">Aucun devis.</p>
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                        <p>Aucun devis pour le moment</p>
+                        <a href="devis.php#form-devis" class="btn btn-primary">Nouveau devis</a>
+                    </div>
                 <?php endif; ?>
             </div>
 
-            <div class="card-section">
+            <!-- Recent invoices -->
+            <div class="card">
                 <h3>Dernieres factures (TTC)</h3>
                 <?php if ($dernieresFactures): ?>
                     <table class="compact">
-                        <thead><tr><th>Client</th><th>Date</th><th style="text-align:right">Montant</th><th>PDF</th></tr></thead>
+                        <thead><tr><th>Client</th><th>Date</th><th class="text-right">Montant</th><th>PDF</th></tr></thead>
                         <tbody>
                         <?php foreach ($dernieresFactures as $f):
                             $fileNameF = basename($f['fichier_pdf'] ?? '');
@@ -435,59 +493,67 @@ if ($hasFact) {
                         ?>
                             <tr>
                                 <td><?= h(trim(($f['nom'] ?? '') . ' ' . ($f['prenom'] ?? ''))) ?></td>
-                                <td class="mono"><?= dmy($f['date_creation'] ?? '') ?></td>
-                                <td class="mono" style="text-align:right"><?= eur($f['prix'] ?? null) ?></td>
+                                <td class="mono" data-date="<?= date('Y-m-d', strtotime($f['date_creation'] ?? 'now')) ?>"><?= dmy($f['date_creation'] ?? '') ?></td>
+                                <td class="mono text-right"><?= eur($f['prix'] ?? null) ?></td>
                                 <td><?= $hasFile ? '<a href="'.h($urlF).'" target="_blank">Ouvrir</a>' : '<span class="muted">—</span>' ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
                 <?php else: ?>
-                    <p class="muted">Aucune facture.</p>
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                        <p>Aucune facture generee</p>
+                    </div>
                 <?php endif; ?>
             </div>
+
         </div>
 
         <!-- Right column -->
-        <div style="display:grid;gap:var(--gap-3);align-content:start;">
+        <div class="dashboard-col">
             <!-- Pipeline -->
             <div class="card">
-                <h3 style="margin-bottom:12px;">Vue pipeline</h3>
+                <h3>Vue pipeline</h3>
                 <?php
                 $dv30 = 0; $sumDv30 = 0.0;
                 if ($hasDevis) {
                     $st = $pdo->prepare("SELECT COUNT(*), COALESCE(SUM($dvTotal),0) FROM devis WHERE DATE($dvDate) >= :dmin");
-                    $st->execute([
-    ':dmin' => date('Y-m-d', strtotime('-30 days'))
-]); 
+                    $st->execute([':dmin' => date('Y-m-d', strtotime('-30 days'))]);
                     [$dv30, $sumDv30] = $st->fetch(PDO::FETCH_NUM);
                 }
                 ?>
-                <div class="stat-card" style="box-shadow:none;border:1px solid var(--bd);">
-                    <div class="stat-label">Devis (30 derniers jours)</div>
-                    <div class="stat-value"><?= (int)$dv30 ?></div>
-                    <div class="stat-sub">Montant cumule : <?= eur($sumDv30 ?? 0) ?></div>
+                <div class="pipeline-cards">
+                    <a href="devis.php?date_from=<?= urlencode(date('Y-m-d', strtotime('-30 days'))) ?>&date_to=<?= urlencode(date('Y-m-d')) ?>#documents" class="stat-card pipeline-stat pipeline-link">
+                        <div>
+                            <div class="stat-label">Devis (30 derniers jours)</div>
+                            <div class="stat-value" data-count="<?= (int)$dv30 ?>" data-format="int"><?= (int)$dv30 ?></div>
+                            <div class="stat-sub">Montant cumule : <?= eur($sumDv30 ?? 0) ?></div>
+                        </div>
+                    </a>
+                    <?php if ($toFollow !== null && $toFollow > 0): ?>
+                    <a href="devis.php#documents" class="stat-card orange pipeline-stat pipeline-link">
+                        <div>
+                            <div class="stat-label">Devis a relancer</div>
+                            <div class="stat-value" data-count="<?= (int)$toFollow ?>" data-format="int"><?= (int)$toFollow ?></div>
+                            <div class="stat-sub">Sans facture associee (30j)</div>
+                        </div>
+                    </a>
+                    <?php endif; ?>
                 </div>
-                <?php if ($toFollow !== null && $toFollow > 0): ?>
-                <div class="stat-card orange" style="box-shadow:none;border:1px solid var(--bd);margin-top:8px;">
-                    <div class="stat-label">Devis a relancer</div>
-                    <div class="stat-value"><?= (int)$toFollow ?></div>
-                    <div class="stat-sub">Sans facture associee (30j)</div>
-                </div>
-                <?php endif; ?>
             </div>
 
             <?php if (!empty($topPac)): ?>
             <div class="card">
                 <h3>Top materiels (90 jours)</h3>
                 <table class="compact">
-                    <thead><tr><th>Materiel</th><th style="text-align:right">Qte</th><th style="text-align:right">CA (HT)</th></tr></thead>
+                    <thead><tr><th>Materiel</th><th class="text-right">Qte</th><th class="text-right">CA (HT)</th></tr></thead>
                     <tbody>
                     <?php foreach ($topPac as $p): ?>
                         <tr>
                             <td><?= h($p['nom'] ?? '—') ?></td>
-                            <td class="mono" style="text-align:right"><?= (int)($p['qty'] ?? 0) ?></td>
-                            <td class="mono" style="text-align:right"><?= eur($p['ca_ht'] ?? 0) ?></td>
+                            <td class="mono text-right"><?= (int)($p['qty'] ?? 0) ?></td>
+                            <td class="mono text-right"><?= eur($p['ca_ht'] ?? 0) ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -499,14 +565,12 @@ if ($hasFact) {
             <div class="card">
                 <h3>CA — 6 derniers mois (TTC)</h3>
                 <table class="compact">
-                    <thead><tr><th>Mois</th><th style="text-align:right">Total</th></tr></thead>
+                    <thead><tr><th>Mois</th><th class="text-right">Total</th></tr></thead>
                     <tbody>
                     <?php foreach ($caMonths as $row): ?>
                         <tr>
-                            <td class="mono">
-    <?= h(date('m/Y', strtotime($row['mois'] . '-01'))) ?>
-</td>
-                            <td class="mono" style="text-align:right"><?= eur($row['total']) ?></td>
+                            <td class="mono"><?= h(date('m/Y', strtotime($row['mois'] . '-01'))) ?></td>
+                            <td class="mono text-right"><?= eur($row['total']) ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -516,5 +580,37 @@ if ($hasFact) {
         </div>
     </div>
 </div>
+<script>
+(function(){
+  function fmtEur(n){
+    var p=n.toFixed(2).split('.');
+    var w=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+    return w+','+p[1]+' \u20AC';
+  }
+  function run(){
+    var els=document.querySelectorAll('[data-count]');
+    els.forEach(function(el){
+      var target=parseFloat(el.getAttribute('data-count'));
+      var fmt=el.getAttribute('data-format')||'int';
+      if(isNaN(target)||target===0)return;
+      var dur=800,start=null;
+      function step(ts){
+        if(!start)start=ts;
+        var p=Math.min((ts-start)/dur,1);
+        var e=1-Math.pow(1-p,3);
+        var c=target*e;
+        el.textContent=fmt==='eur'?fmtEur(c):Math.round(c).toString();
+        if(p<1)requestAnimationFrame(step);
+        else el.textContent=fmt==='eur'?fmtEur(target):Math.round(target).toString();
+      }
+      el.textContent=fmt==='eur'?fmtEur(0):'0';
+      requestAnimationFrame(step);
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);
+  else run();
+})();
+</script>
+<?php require __DIR__ . '/inc/toast.php'; ?>
 </body>
 </html>

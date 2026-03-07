@@ -8,6 +8,13 @@ if (empty($_SESSION['csrf_token'])) { $_SESSION['csrf_token'] = bin2hex(random_b
 /* ──────────── Paramètres recherche & limite ──────────── */
 $q = trim($_GET['q'] ?? '');
 $limit = 10;
+$page_devis = max(1, (int)($_GET['page_devis'] ?? 1));
+$page_bdc   = max(1, (int)($_GET['page_bdc']   ?? 1));
+$page_fac   = max(1, (int)($_GET['page_fac']    ?? 1));
+$dateFrom   = trim($_GET['date_from'] ?? '');
+$dateTo     = trim($_GET['date_to']   ?? '');
+if ($dateFrom && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = '';
+if ($dateTo   && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo))   $dateTo   = '';
 
 /* ──────────── Récupération des données (formulaire) ──────────── */
 
@@ -38,7 +45,7 @@ function first_col(array $prefs, array $cols, $fallback = null) {
 }
 
 /* ──────────── LISTES : Devis / BDC / Factures (10 + recherche) ──────────── */
-function fetch_devis(PDO $pdo, string $q, int $limit): array {
+function fetch_devis(PDO $pdo, string $q, int $limit, int $page = 1, string $dateFrom = '', string $dateTo = ''): array {
     if (!table_exists($pdo, 'devis') || !table_exists($pdo, 'clients')) return [];
     $c_devis   = show_cols($pdo, 'devis');
     $c_clients = show_cols($pdo, 'clients');
@@ -66,17 +73,21 @@ function fetch_devis(PDO $pdo, string $q, int $limit): array {
         $where[] = " (c.`$nomCol` LIKE :q OR c.`$preCol` LIKE :q".($phoneCol ? " OR c.`$phoneCol` LIKE :q" : "").") ";
         $params[':q'] = "%$q%";
     }
+    if ($dateFrom !== '') { $where[] = "DATE(d.`$dateCol`) >= :df"; $params[':df'] = $dateFrom; }
+    if ($dateTo   !== '') { $where[] = "DATE(d.`$dateCol`) <= :dt"; $params[':dt'] = $dateTo; }
     if ($where) $sql .= " WHERE ".implode(' AND ', $where);
-    $sql .= " ORDER BY d.`$dateCol` DESC, d.id DESC LIMIT :lim";
+    $sql .= " ORDER BY d.`$dateCol` DESC, d.id DESC LIMIT :lim OFFSET :off";
 
+    $offset = ($page - 1) * $limit;
     $st = $pdo->prepare($sql);
     foreach ($params as $k=>$v) $st->bindValue($k, $v, PDO::PARAM_STR);
     $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+    $st->bindValue(':off', $offset, PDO::PARAM_INT);
     $st->execute();
     return $st->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function fetch_bdc(PDO $pdo, string $q, int $limit): array {
+function fetch_bdc(PDO $pdo, string $q, int $limit, int $page = 1, string $dateFrom = '', string $dateTo = ''): array {
     if (!table_exists($pdo, 'bons_de_commande') || !table_exists($pdo, 'devis') || !table_exists($pdo, 'clients')) return [];
     $c_bdc     = show_cols($pdo, 'bons_de_commande');
     $c_devis   = show_cols($pdo, 'devis');
@@ -108,17 +119,21 @@ function fetch_bdc(PDO $pdo, string $q, int $limit): array {
         $where[] = " (c.`$nomCol` LIKE :q OR c.`$preCol` LIKE :q".($phoneCol ? " OR c.`$phoneCol` LIKE :q" : "").") ";
         $params[':q'] = "%$q%";
     }
+    if ($dateFrom !== '') { $where[] = "DATE(b.`$dateCol`) >= :df"; $params[':df'] = $dateFrom; }
+    if ($dateTo   !== '') { $where[] = "DATE(b.`$dateCol`) <= :dt"; $params[':dt'] = $dateTo; }
     if ($where) $sql .= " WHERE ".implode(' AND ', $where);
-    $sql .= " ORDER BY b.`$dateCol` DESC, b.id DESC LIMIT :lim";
+    $sql .= " ORDER BY b.`$dateCol` DESC, b.id DESC LIMIT :lim OFFSET :off";
 
+    $offset = ($page - 1) * $limit;
     $st = $pdo->prepare($sql);
     foreach ($params as $k=>$v) $st->bindValue($k, $v, PDO::PARAM_STR);
     $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+    $st->bindValue(':off', $offset, PDO::PARAM_INT);
     $st->execute();
     return $st->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function fetch_factures(PDO $pdo, string $q, int $limit): array {
+function fetch_factures(PDO $pdo, string $q, int $limit, int $page = 1, string $dateFrom = '', string $dateTo = ''): array {
     if (!table_exists($pdo, 'factures') || !table_exists($pdo, 'clients')) return [];
     $c_fac     = show_cols($pdo, 'factures');
     $c_clients = show_cols($pdo, 'clients');
@@ -156,14 +171,118 @@ function fetch_factures(PDO $pdo, string $q, int $limit): array {
         $where[] = " (c.`$nomCol` LIKE :q OR c.`$preCol` LIKE :q".($phoneCol ? " OR c.`$phoneCol` LIKE :q" : "").") ";
         $params[':q'] = "%$q%";
     }
+    if ($dateFrom !== '') { $where[] = "DATE(f.`$dateCol`) >= :df"; $params[':df'] = $dateFrom; }
+    if ($dateTo   !== '') { $where[] = "DATE(f.`$dateCol`) <= :dt"; $params[':dt'] = $dateTo; }
     if ($where) $sql .= " WHERE ".implode(' AND ', $where);
-    $sql .= " ORDER BY f.`$dateCol` DESC, f.id DESC LIMIT :lim";
+    $sql .= " ORDER BY f.`$dateCol` DESC, f.id DESC LIMIT :lim OFFSET :off";
 
+    $offset = ($page - 1) * $limit;
     $st = $pdo->prepare($sql);
     foreach ($params as $k=>$v) $st->bindValue($k, $v, PDO::PARAM_STR);
     $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+    $st->bindValue(':off', $offset, PDO::PARAM_INT);
     $st->execute();
     return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/* ──────────── Compteurs pour pagination ──────────── */
+function count_devis(PDO $pdo, string $q, string $dateFrom = '', string $dateTo = ''): int {
+    if (!table_exists($pdo, 'devis') || !table_exists($pdo, 'clients')) return 0;
+    $c_devis = show_cols($pdo, 'devis'); $c_clients = show_cols($pdo, 'clients');
+    $clientId = first_col(['client_id','id_client'], $c_devis, 'client_id');
+    $dateCol = first_col(['date_creation','created_at','date','date_devis'], $c_devis, 'date_creation');
+    $nomCol = first_col(['nom','last_name','lastname'], $c_clients, 'nom');
+    $preCol = first_col(['prenom','first_name','firstname'], $c_clients, 'prenom');
+    $phoneCol = first_col(['telephone','tel','phone','mobile','gsm'], $c_clients);
+    $sql = "SELECT COUNT(*) FROM devis d JOIN clients c ON c.id = d.`$clientId`";
+    $where = []; $params = [];
+    if ($q !== '') { $where[] = "(c.`$nomCol` LIKE :q OR c.`$preCol` LIKE :q".($phoneCol ? " OR c.`$phoneCol` LIKE :q" : "").")"; $params[':q'] = "%$q%"; }
+    if ($dateFrom !== '') { $where[] = "DATE(d.`$dateCol`) >= :df"; $params[':df'] = $dateFrom; }
+    if ($dateTo   !== '') { $where[] = "DATE(d.`$dateCol`) <= :dt"; $params[':dt'] = $dateTo; }
+    if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+    $st = $pdo->prepare($sql);
+    foreach ($params as $k=>$v) $st->bindValue($k, $v, PDO::PARAM_STR);
+    $st->execute();
+    return (int)$st->fetchColumn();
+}
+function count_bdc(PDO $pdo, string $q, string $dateFrom = '', string $dateTo = ''): int {
+    if (!table_exists($pdo, 'bons_de_commande') || !table_exists($pdo, 'devis') || !table_exists($pdo, 'clients')) return 0;
+    $c_bdc = show_cols($pdo, 'bons_de_commande'); $c_devis = show_cols($pdo, 'devis'); $c_clients = show_cols($pdo, 'clients');
+    $dateCol = first_col(['date_creation','created_at','date'], $c_bdc, 'date_creation');
+    $dv_cliCol = first_col(['client_id'], $c_devis, 'client_id');
+    $dv_idCol = first_col(['id'], $c_devis, 'id');
+    $nomCol = first_col(['nom','last_name','lastname'], $c_clients, 'nom');
+    $preCol = first_col(['prenom','first_name','firstname'], $c_clients, 'prenom');
+    $phoneCol = first_col(['telephone','tel','phone','mobile','gsm'], $c_clients);
+    $sql = "SELECT COUNT(*) FROM bons_de_commande b JOIN devis d ON d.`$dv_idCol` = b.devis_id JOIN clients c ON c.id = d.`$dv_cliCol`";
+    $where = []; $params = [];
+    if ($q !== '') { $where[] = "(c.`$nomCol` LIKE :q OR c.`$preCol` LIKE :q".($phoneCol ? " OR c.`$phoneCol` LIKE :q" : "").")"; $params[':q'] = "%$q%"; }
+    if ($dateFrom !== '') { $where[] = "DATE(b.`$dateCol`) >= :df"; $params[':df'] = $dateFrom; }
+    if ($dateTo   !== '') { $where[] = "DATE(b.`$dateCol`) <= :dt"; $params[':dt'] = $dateTo; }
+    if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+    $st = $pdo->prepare($sql);
+    foreach ($params as $k=>$v) $st->bindValue($k, $v, PDO::PARAM_STR);
+    $st->execute();
+    return (int)$st->fetchColumn();
+}
+function count_factures(PDO $pdo, string $q, string $dateFrom = '', string $dateTo = ''): int {
+    if (!table_exists($pdo, 'factures') || !table_exists($pdo, 'clients')) return 0;
+    $c_fac = show_cols($pdo, 'factures'); $c_clients = show_cols($pdo, 'clients');
+    $dateCol = first_col(['date_facture','date_creation','created_at','date'], $c_fac, 'date_creation');
+    $nomCol = first_col(['nom','last_name','lastname'], $c_clients, 'nom');
+    $preCol = first_col(['prenom','first_name','firstname'], $c_clients, 'prenom');
+    $phoneCol = first_col(['telephone','tel','phone','mobile','gsm'], $c_clients);
+    if (in_array('client_id', $c_fac, true)) {
+        $join = "JOIN clients c ON c.id = f.client_id";
+    } else {
+        if (!table_exists($pdo, 'devis')) return 0;
+        $c_devis = show_cols($pdo, 'devis');
+        $dv_idCol = first_col(['id'], $c_devis, 'id');
+        $dv_cli = first_col(['client_id'], $c_devis, 'client_id');
+        $join = "JOIN devis d ON d.`$dv_idCol` = f.devis_id JOIN clients c ON c.id = d.`$dv_cli`";
+    }
+    $sql = "SELECT COUNT(*) FROM factures f $join";
+    $where = []; $params = [];
+    if ($q !== '') { $where[] = "(c.`$nomCol` LIKE :q OR c.`$preCol` LIKE :q".($phoneCol ? " OR c.`$phoneCol` LIKE :q" : "").")"; $params[':q'] = "%$q%"; }
+    if ($dateFrom !== '') { $where[] = "DATE(f.`$dateCol`) >= :df"; $params[':df'] = $dateFrom; }
+    if ($dateTo   !== '') { $where[] = "DATE(f.`$dateCol`) <= :dt"; $params[':dt'] = $dateTo; }
+    if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+    $st = $pdo->prepare($sql);
+    foreach ($params as $k=>$v) $st->bindValue($k, $v, PDO::PARAM_STR);
+    $st->execute();
+    return (int)$st->fetchColumn();
+}
+
+function pagination_html(int $page, int $totalPages, string $pageParam, string $q, string $dateFrom = '', string $dateTo = ''): string {
+    if ($totalPages <= 1) return '';
+    // Preserve all current page params from URL
+    $base = [];
+    if ($q !== '') $base['q'] = $q;
+    if ($dateFrom !== '') $base['date_from'] = $dateFrom;
+    if ($dateTo   !== '') $base['date_to']   = $dateTo;
+    foreach (['page_devis','page_bdc','page_fac'] as $pp) {
+        $v = (int)($_GET[$pp] ?? 1);
+        if ($v > 1) $base[$pp] = $v;
+    }
+    $prev = $page > 1 ? $page - 1 : null;
+    $next = $page < $totalPages ? $page + 1 : null;
+    $html = '<div class="pagination">';
+    if ($prev) {
+        $p = $base; $p[$pageParam] = $prev;
+        if ($prev === 1) unset($p[$pageParam]);
+        $html .= '<a class="btn btn-secondary" href="devis.php?' . htmlspecialchars(http_build_query($p)) . '#documents">&laquo; Precedent</a>';
+    } else {
+        $html .= '<button class="btn btn-secondary" disabled>&laquo; Precedent</button>';
+    }
+    $html .= '<span class="page-info">Page ' . $page . ' sur ' . $totalPages . '</span>';
+    if ($next) {
+        $p = $base; $p[$pageParam] = $next;
+        $html .= '<a class="btn btn-secondary" href="devis.php?' . htmlspecialchars(http_build_query($p)) . '#documents">Suivant &raquo;</a>';
+    } else {
+        $html .= '<button class="btn btn-secondary" disabled>Suivant &raquo;</button>';
+    }
+    $html .= '</div>';
+    return $html;
 }
 
 /* ──────────── Helpers pour charger les lignes/PIÈCES ──────────── */
@@ -294,9 +413,21 @@ if (isset($_GET['copy_from_id']) && ctype_digit((string)$_GET['copy_from_id'])) 
 }
 
 /* ──────────── Exécutions des listes ──────────── */
-$devis_list = fetch_devis($pdo, $q, $limit);
-$bdc_list   = fetch_bdc($pdo, $q, $limit);
-$fac_list   = fetch_factures($pdo, $q, $limit);
+$total_devis = count_devis($pdo, $q, $dateFrom, $dateTo);
+$total_bdc   = count_bdc($pdo, $q, $dateFrom, $dateTo);
+$total_fac   = count_factures($pdo, $q, $dateFrom, $dateTo);
+
+$pages_devis = max(1, (int)ceil($total_devis / $limit));
+$pages_bdc   = max(1, (int)ceil($total_bdc   / $limit));
+$pages_fac   = max(1, (int)ceil($total_fac   / $limit));
+
+$page_devis = min($page_devis, $pages_devis);
+$page_bdc   = min($page_bdc,   $pages_bdc);
+$page_fac   = min($page_fac,   $pages_fac);
+
+$devis_list = fetch_devis($pdo, $q, $limit, $page_devis, $dateFrom, $dateTo);
+$bdc_list   = fetch_bdc($pdo, $q, $limit, $page_bdc, $dateFrom, $dateTo);
+$fac_list   = fetch_factures($pdo, $q, $limit, $page_fac, $dateFrom, $dateTo);
 
 $cnt_devis = count($devis_list);
 $cnt_bdc   = count($bdc_list);
@@ -364,7 +495,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             titleWrap.className = 'piece-title-wrap';
             const titleLabel = document.createElement('label');
             titleLabel.textContent = 'Pièce :';
-            titleLabel.style.marginTop = '0';
+            titleLabel.classList.add('mt-0');
             titleWrap.append(titleLabel, pieceNameInput);
 
             const actions = document.createElement('div');
@@ -373,17 +504,21 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             const addMatBtn = document.createElement('button');
             addMatBtn.type = 'button';
             addMatBtn.className = 'btn-outline';
-            addMatBtn.textContent = '➕ Ajouter un matériel';
+            addMatBtn.textContent = '+ Ajouter un matériel';
             addMatBtn.onclick = () => addPacRow(card.querySelector('.lines-container'), pieceKey);
 
             const removePieceBtn = document.createElement('button');
             removePieceBtn.type = 'button';
             removePieceBtn.className = 'btn-danger';
-            removePieceBtn.textContent = '🗑️ Supprimer la pièce';
+            removePieceBtn.textContent = 'Supprimer la pièce';
             removePieceBtn.onclick = () => {
                 const countRows = card.querySelectorAll('.pac-group').length;
                 if (countRows > 0) {
-                    if (!confirm('Supprimer cette pièce et tous ses matériels ?')) return;
+                    confirmAction('Supprimer cette piece et tous ses materiels ?', function() {
+                        card.remove();
+                        updateTotal();
+                    }, {title:'Suppression', confirmText:'Supprimer', danger:true});
+                    return;
                 }
                 card.remove();
                 updateTotal();
@@ -454,7 +589,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             listBtn.type = 'button';
             listBtn.className = 'list-btn';
             listBtn.title = 'Voir la liste des matériels';
-            listBtn.textContent = '📋 Liste';
+            listBtn.textContent = 'Liste';
 
             searchRow.append(search, listBtn);
 
@@ -526,7 +661,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'remove-btn';
-            btn.textContent = '🗑';
+            btn.textContent = 'Suppr.';
             btn.title   = 'Retirer cette ligne';
             btn.onclick = () => { row.remove(); updateTotal(); };
 
@@ -766,34 +901,147 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             if (addBtn) addBtn.addEventListener('click', (e) => { e.preventDefault(); addPiece('Pièce'); });
 
             const prefill = window.__prefill || null;
-            if (prefill) { prefillFromData(prefill); }
-            else { addPiece('Salon'); }
+            // Auto-save draft restore
+            var __draft = null;
+            try { __draft = localStorage.getItem('devis_draft_v1'); } catch(ex){}
+            if (prefill) {
+                prefillFromData(prefill);
+                try { localStorage.removeItem('devis_draft_v1'); } catch(ex){}
+            } else if (__draft) {
+                try {
+                    var draftData = JSON.parse(__draft);
+                    confirmAction(
+                        'Un brouillon non enregistre a ete trouve. Voulez-vous le restaurer ?',
+                        function(){
+                            // Restore simple fields
+                            var f = document.getElementById('form-devis');
+                            if (draftData.client_id) { var s = f.querySelector('#client_id'); if(s) s.value = draftData.client_id; }
+                            if (draftData.description) { var d = f.querySelector('#description'); if(d) d.value = draftData.description; }
+                            if (draftData.date_creation_date) { var dc = f.querySelector('#date_creation_date'); if(dc) dc.value = draftData.date_creation_date; }
+                            if (draftData.date_echeance) { var de = f.querySelector('#date_echeance'); if(de) de.value = draftData.date_echeance; }
+                            if (draftData.mode_paiement_1) { var mp = f.querySelector('#mode_paiement_1'); if(mp) mp.value = draftData.mode_paiement_1; }
+                            if (draftData.bank_account_id_1) { var ba = f.querySelector('#bank_account_id_1'); if(ba) ba.value = draftData.bank_account_id_1; }
+                            // Restore pieces
+                            if (draftData.pieces && draftData.pieces.length) {
+                                document.getElementById('pieces-holder').innerHTML = '';
+                                draftData.pieces.forEach(function(p){
+                                    addPiece(p.nom || 'Piece', p.items || []);
+                                });
+                            }
+                            syncDateCreation();
+                            updateTotal();
+                            window.__devisDirty = true;
+                        },
+                        {title:'Brouillon disponible', confirmText:'Restaurer', cancelText:'Ignorer', danger:false}
+                    );
+                    addPiece('Salon');
+                } catch(ex){ addPiece('Salon'); }
+            } else { addPiece('Salon'); }
 
             const inputDate = document.getElementById('date_creation_date');
             if (inputDate) { inputDate.addEventListener('change', syncDateCreation); syncDateCreation(); }
 
             const form = document.getElementById('form-devis');
             if (form) {
-                form.addEventListener('submit', () => {
-                    // 1) Sécuriser les quantités
+                form.addEventListener('submit', (e) => {
+                    // --- Validation ---
+                    function _clrErr(el){ if(!el)return; el.classList.remove('field-error'); var m=el.parentNode.querySelector('.field-error-msg'); if(m)m.remove(); }
+                    function _setErr(el,msg){ if(!el)return; _clrErr(el); el.classList.add('field-error'); var s=document.createElement('span'); s.className='field-error-msg'; s.textContent=msg; el.parentNode.appendChild(s); }
+
+                    var valid = true;
+                    var clientId = document.getElementById('client_id');
+                    var desc = document.getElementById('description');
+                    var dateC = document.getElementById('date_creation_date');
+                    var dateE = document.getElementById('date_echeance');
+
+                    if (clientId && !clientId.value) { _setErr(clientId, 'Veuillez selectionner un client.'); valid = false; } else { _clrErr(clientId); }
+                    if (desc && !desc.value.trim()) { _setErr(desc, 'Veuillez decrire l\'installation.'); valid = false; } else { _clrErr(desc); }
+                    if (dateC && !dateC.value) { _setErr(dateC, 'Date de creation requise.'); valid = false; } else { _clrErr(dateC); }
+                    if (dateE && !dateE.value) { _setErr(dateE, 'Date d\'echeance requise.'); valid = false; } else { _clrErr(dateE); }
+
+                    var hasItems = false;
+                    document.querySelectorAll('.piece-card').forEach(c => { if(c.querySelectorAll('.pac-group').length>0) hasItems=true; });
+                    if (!hasItems) { if(typeof showToast==='function') showToast('Ajoutez au moins un materiel.','error'); valid = false; }
+
+                    if (!valid) { e.preventDefault(); var fe=form.querySelector('.field-error'); if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+
+                    // --- Original logic ---
                     document.querySelectorAll('.pac-qty').forEach(clampQty);
-                    // 2) Supprimer les pièces vides
                     document.querySelectorAll('.piece-card').forEach(card => {
-                        if (card.querySelectorAll('.pac-group').length === 0) {
-                            card.remove();
-                        }
+                        if (card.querySelectorAll('.pac-group').length === 0) card.remove();
                     });
-                    // 3) Normaliser TVA 0 -> "0.0"
                     normalizeZeroTvaBeforeSubmit();
-                    // 4) Sync date
                     syncDateCreation();
-                    // 5) Recalculer et pousser le montant du paiement
                     const totals = updateTotal();
                     const m1 = document.getElementById('montant_paiement_1');
                     if (m1) m1.value = totals.totalTTC.toFixed(2);
 
-                    try { localStorage.setItem('devis_created', '1'); } catch(e){}
+                    window.__devisDirty = false;
+                    try { localStorage.removeItem('devis_draft_v1'); } catch(ex){}
+                    try { localStorage.setItem('devis_created', '1'); } catch(ex){}
                 });
+
+                // Clear validation errors on input
+                ['client_id','description','date_creation_date','date_echeance'].forEach(id => {
+                    var el = document.getElementById(id);
+                    if(el){ el.addEventListener('input',()=>{el.classList.remove('field-error');var m=el.parentNode.querySelector('.field-error-msg');if(m)m.remove();}); el.addEventListener('change',()=>{el.classList.remove('field-error');var m=el.parentNode.querySelector('.field-error-msg');if(m)m.remove();}); }
+                });
+
+                // Unsaved changes warning
+                window.__devisDirty = false;
+                form.addEventListener('input', function(){ window.__devisDirty = true; });
+                form.addEventListener('change', function(){ window.__devisDirty = true; });
+                window.addEventListener('beforeunload', function(e){
+                    if (!window.__devisDirty) return;
+                    e.preventDefault();
+                    e.returnValue = '';
+                });
+
+                // Auto-save draft to localStorage (debounced 1500ms)
+                var draftTimer = null;
+                function collectDraft() {
+                    var pieces = [];
+                    document.querySelectorAll('.piece-card').forEach(function(card){
+                        var nameInput = card.querySelector('input[name*="[nom]"]');
+                        var items = [];
+                        card.querySelectorAll('.pac-group').forEach(function(row){
+                            var sel = row.querySelector('select[name="pac_ids[]"]');
+                            items.push({
+                                pac_id: sel ? sel.value : '',
+                                libelle: (row.querySelector('input[name="libelles[]"]') || {}).value || '',
+                                quantite: parseInt((row.querySelector('.pac-qty') || {}).value) || 1,
+                                prix_ht: parseFloat((row.querySelector('.pac-price') || {}).value) || 0,
+                                tva: parseFloat((row.querySelector('.tva-select') || {}).value) || 20
+                            });
+                        });
+                        pieces.push({ nom: nameInput ? nameInput.value : '', items: items });
+                    });
+                    return {
+                        client_id: (document.getElementById('client_id') || {}).value || '',
+                        description: (document.getElementById('description') || {}).value || '',
+                        date_creation_date: (document.getElementById('date_creation_date') || {}).value || '',
+                        date_echeance: (document.getElementById('date_echeance') || {}).value || '',
+                        mode_paiement_1: (document.getElementById('mode_paiement_1') || {}).value || '',
+                        bank_account_id_1: (document.getElementById('bank_account_id_1') || {}).value || '',
+                        pieces: pieces
+                    };
+                }
+                function saveDraft() {
+                    clearTimeout(draftTimer);
+                    draftTimer = setTimeout(function(){
+                        try { localStorage.setItem('devis_draft_v1', JSON.stringify(collectDraft())); } catch(ex){}
+                    }, 1500);
+                }
+                form.addEventListener('input', saveDraft);
+                form.addEventListener('change', saveDraft);
+
+                // Clear draft on reset
+                var resetBtn = document.getElementById('btn-reset-devis');
+                if (resetBtn) {
+                    resetBtn.addEventListener('click', function(){
+                        try { localStorage.removeItem('devis_draft_v1'); } catch(ex){}
+                    });
+                }
             }
         });
     </script>
@@ -817,12 +1065,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
       <div class="info"><?= $copyBanner ?></div>
     <?php endif; ?>
 
-    <?php if (!empty($_GET['msg'])): ?>
-      <div class="alert success"><?= htmlspecialchars($_GET['msg']) ?></div>
-    <?php endif; ?>
-    <?php if (!empty($_GET['err'])): ?>
-      <div class="alert error"><?= htmlspecialchars($_GET['err']) ?></div>
-    <?php endif; ?>
+    <!-- Toasts auto-triggered from URL params by inc/toast.js -->
 
     <!-- ============== 1) PRÉPARATION DU DEVIS ============== -->
     <section id="prep" class="card">
@@ -856,7 +1099,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
         </div>
 
         <div class="pieces-toolbar">
-          <button type="button" id="add-piece-btn" class="add-piece-btn">➕ Ajouter une pièce</button>
+          <button type="button" id="add-piece-btn" class="add-piece-btn">+ Ajouter une pièce</button>
           <span class="muted">Astuce : les quantités laissées vides seront prises comme <strong>1</strong> à l'enregistrement.</span>
         </div>
 
@@ -870,8 +1113,8 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
           <div>
             <label>Paiement</label>
-            <div id="pay-block" class="card" style="padding:var(--gap-3);">
-              <div style="display:grid;grid-template-columns:1fr 160px 1fr;gap:var(--gap-2);align-items:end;">
+            <div id="pay-block" class="card">
+              <div class="grid-3">
                 <div>
                   <label for="mode_paiement_1">Mode de règlement</label>
                   <select id="mode_paiement_1" name="mode_paiement_1" required>
@@ -903,33 +1146,41 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
           </div>
         </div>
 
-        <div id="total-container">
-          <span class="total-chip"><strong>Total HT :</strong> <span id="total">0.00 €</span></span>
-          <span class="total-chip"><strong>Total TTC :</strong> <span id="total_ttc">0.00 €</span></span>
-        </div>
-
-        <div class="inline" style="margin-top:var(--gap-2);">
-          <button type="submit" class="btn btn-save">Enregistrer le devis</button>
-          <a class="btn btn-secondary" href="devis.php">Réinitialiser</a>
+        <div id="devis-sticky-bar">
+          <div id="total-container" aria-live="polite" aria-atomic="true">
+            <span class="total-chip"><strong>Total HT :</strong> <span id="total">0.00 €</span></span>
+            <span class="total-chip"><strong>Total TTC :</strong> <span id="total_ttc">0.00 €</span></span>
+          </div>
+          <div class="inline mt-2">
+            <button type="submit" class="btn btn-save">Enregistrer le devis</button>
+            <a id="btn-reset-devis" class="btn btn-secondary" href="devis.php">Réinitialiser</a>
+          </div>
         </div>
       </form>
     </section>
 
     <!-- ============== 2) DOCUMENTS : recherche & 10 derniers ============== -->
-    <section id="documents" class="card" style="margin-top:var(--gap-3);">
+    <section id="documents" class="card mt-3">
       <h2>Documents recents</h2>
       <p class="muted">Retrouvez rapidement les derniers devis, bons de commande et factures. Utilisez la recherche par client.</p>
 
       <form class="searchbar" method="get" action="#documents">
-        <input type="text" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" placeholder="Recherche : nom, prénom ou téléphone du client">
+        <input type="text" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" placeholder="Recherche : nom, prenom ou telephone du client">
+        <input type="date" name="date_from" value="<?= htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') ?>" title="Date de debut">
+        <input type="date" name="date_to" value="<?= htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') ?>" title="Date de fin">
         <button type="submit" class="btn btn-primary">Rechercher</button>
-        <?php if ($q !== ''): ?><a class="btn btn-secondary" href="devis.php#documents">Réinitialiser</a><?php endif; ?>
+        <?php if ($q !== '' || $dateFrom !== '' || $dateTo !== ''): ?><a class="btn btn-secondary" href="devis.php#documents">Reinitialiser</a><?php endif; ?>
       </form>
+      <div class="inline" style="margin-bottom: var(--gap-3);">
+        <a href="export_devis_csv.php?type=devis&q=<?= urlencode($q) ?>&date_from=<?= urlencode($dateFrom) ?>&date_to=<?= urlencode($dateTo) ?>" class="btn btn-secondary">Exporter devis CSV</a>
+        <a href="export_devis_csv.php?type=bdc&q=<?= urlencode($q) ?>&date_from=<?= urlencode($dateFrom) ?>&date_to=<?= urlencode($dateTo) ?>" class="btn btn-secondary">Exporter BDC CSV</a>
+        <a href="export_devis_csv.php?type=factures&q=<?= urlencode($q) ?>&date_from=<?= urlencode($dateFrom) ?>&date_to=<?= urlencode($dateTo) ?>" class="btn btn-secondary">Exporter factures CSV</a>
+      </div>
 
       <div class="cards">
         <!-- Devis -->
         <div class="card">
-          <h3>Devis <span class="pill">10 derniers</span> <span class="pill">Résultats: <?= (int)$cnt_devis ?></span></h3>
+          <h3>Devis <span class="pill"><?= $total_devis ?> total</span></h3>
           <div class="table-wrap">
             <table class="table-docs">
               <thead>
@@ -966,11 +1217,12 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
               </tbody>
             </table>
           </div>
+          <?= pagination_html($page_devis, $pages_devis, 'page_devis', $q, $dateFrom, $dateTo) ?>
         </div>
 
         <!-- Bons de commande -->
         <div class="card">
-          <h3>Bons de commande <span class="pill">10 derniers</span> <span class="pill">Résultats: <?= (int)$cnt_bdc ?></span></h3>
+          <h3>Bons de commande <span class="pill"><?= $total_bdc ?> total</span></h3>
           <div class="table-wrap">
             <table class="table-docs">
               <thead>
@@ -1001,11 +1253,12 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
               </tbody>
             </table>
           </div>
+          <?= pagination_html($page_bdc, $pages_bdc, 'page_bdc', $q, $dateFrom, $dateTo) ?>
         </div>
 
         <!-- Factures -->
         <div class="card">
-          <h3>Factures <span class="pill">10 dernières</span> <span class="pill">Résultats: <?= (int)$cnt_fac ?></span></h3>
+          <h3>Factures <span class="pill"><?= $total_fac ?> total</span></h3>
           <div class="table-wrap">
             <table class="table-docs">
               <thead>
@@ -1036,6 +1289,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
               </tbody>
             </table>
           </div>
+          <?= pagination_html($page_fac, $pages_fac, 'page_fac', $q, $dateFrom, $dateTo) ?>
         </div>
       </div>
     </section>
@@ -1062,5 +1316,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 })();
 </script>
 
+<?php require __DIR__ . '/inc/toast.php'; ?>
+<?php require __DIR__ . '/inc/modal.php'; ?>
 </body>
 </html>

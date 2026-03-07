@@ -313,6 +313,17 @@ try {
 
 <?php require __DIR__ . '/inc/sidebar.php'; ?>
 
+<?php
+  // Compute stats for summary cards
+  $totalUsers = count($users);
+  $adminCount = 0;
+  $userCount = 0;
+  foreach ($users as $_u) {
+      if ($_u['role'] === 'admin') $adminCount++;
+      else $userCount++;
+  }
+?>
+
 <div class="main">
   <div class="page-header">
     <div>
@@ -321,80 +332,114 @@ try {
     </div>
   </div>
 
-  <?php if (!empty($_GET['msg'])): ?><div class="flash"><?= e($_GET['msg']) ?></div><?php endif; ?>
-  <?php if (!empty($_GET['err'])): ?><div class="alert error"><?= e($_GET['err']) ?></div><?php endif; ?>
+  <!-- Toasts auto-triggered from URL params by inc/toast.js -->
 
-  <!-- ====== Bloc supérieur comme « ajout_pac.php » : deux cartes côte à côte ====== -->
+  <!-- ====== Summary stats ====== -->
+  <div class="grid-3">
+    <div class="stat-card">
+      <div class="stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div>
+        <div class="stat-label">Total comptes</div>
+        <div class="stat-value"><?= $totalUsers ?></div>
+        <div class="stat-sub">Utilisateurs enregistres</div>
+      </div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div>
+        <div class="stat-label">Administrateurs</div>
+        <div class="stat-value"><?= $adminCount ?></div>
+        <div class="stat-sub">Acces complet</div>
+      </div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div>
+        <div class="stat-label">Utilisateurs</div>
+        <div class="stat-value"><?= $userCount ?></div>
+        <div class="stat-sub">Acces standard</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Bloc superieur : deux cartes cote a cote ====== -->
   <div class="grid-2">
-    <!-- 1) Création de compte (admin uniquement) -->
+
+    <!-- 1) Creation de compte (admin uniquement) -->
     <section id="create" class="card">
       <h2>Creer un compte</h2>
-      <p class="muted" style="margin-top:-6px">
+      <div class="subtitle">
         <?php if ($isAdmin): ?>
-          Renseignez l'identifiant, un mot de passe et le rôle.
+          Renseignez l'identifiant, un mot de passe et le role.
         <?php else: ?>
-          Cette section est réservée aux administrateurs.
+          Cette section est reservee aux administrateurs.
         <?php endif; ?>
-      </p>
+      </div>
 
       <?php if ($isAdmin): ?>
       <form method="post" autocomplete="off" class="stack">
         <input type="hidden" name="csrf_token" value="<?= e($_SESSION['csrf_token']) ?>">
         <input type="hidden" name="action" value="create">
 
-        <div>
+        <div class="form-group">
           <label for="username">Nom d'utilisateur</label>
           <input type="text" name="username" id="username" minlength="3" required placeholder="ex : jdupont">
-          <div class="hint">Autorisé : lettres, chiffres, « . » « - » « _ »</div>
+          <div class="hint">Autorise : lettres, chiffres, . - _</div>
         </div>
 
         <div class="row-grid">
-          <div>
+          <div class="form-group">
             <label for="password">Mot de passe</label>
-            <input type="password" name="password" id="password" minlength="8" required placeholder="Min. 8 caractères">
+            <input type="password" name="password" id="password" minlength="8" required placeholder="Min. 8 caracteres">
           </div>
-          <div>
+          <div class="form-group">
             <label for="confirm">Confirmer le mot de passe</label>
             <input type="password" name="confirm" id="confirm" minlength="8" required>
           </div>
         </div>
 
-        <div>
-          <label for="role">Rôle</label>
+        <div class="form-group">
+          <label for="role">Role</label>
           <select name="role" id="role">
             <option value="user">Utilisateur</option>
             <option value="admin">Administrateur</option>
           </select>
         </div>
 
-        <div class="inline" style="margin-top:4px;">
-          <button class="btn btn-save" type="submit">Créer le compte</button>
-          <span class="muted">Les mots de passe sont chiffrés via <code>password_hash()</code>.</span>
+        <div class="inline">
+          <button class="btn btn-save" type="submit">Creer le compte</button>
+          <span class="hint">Mots de passe chiffres via <code>password_hash()</code>.</span>
         </div>
       </form>
       <?php else: ?>
-        <div class="alert">
-          Vous n'avez pas les droits suffisants pour créer des comptes.
+        <div class="alert error">
+          Vous n'avez pas les droits suffisants pour creer des comptes.
         </div>
       <?php endif; ?>
     </section>
 
     <!-- 2) Changer un mot de passe -->
     <section id="passwd" class="card">
-      <h2>🔐 Changer un mot de passe</h2>
-      <p class="muted" style="margin-top:-6px">
+      <h2>Changer un mot de passe</h2>
+      <div class="subtitle">
         <?php if ($isAdmin): ?>
-          Vous pouvez réinitialiser le mot de passe de n'importe quel compte.
+          Vous pouvez reinitialiser le mot de passe de n'importe quel compte.
         <?php else: ?>
           Vous pouvez uniquement modifier votre propre mot de passe.
         <?php endif; ?>
-      </p>
+      </div>
 
       <form method="post" autocomplete="off" id="form-passwd" class="stack">
         <input type="hidden" name="csrf_token" value="<?= e($_SESSION['csrf_token']) ?>">
         <input type="hidden" name="action" value="passwd">
 
-        <div>
+        <div class="form-group">
           <label for="user_id">Utilisateur</label>
           <select name="user_id" id="user_id" required>
             <option value="">-- Choisir --</option>
@@ -407,93 +452,106 @@ try {
         </div>
 
         <div class="row-grid">
-          <div>
+          <div class="form-group">
             <label for="new_password">Nouveau mot de passe</label>
             <input type="password" name="new_password" id="new_password" minlength="8" required>
           </div>
-          <div>
+          <div class="form-group">
             <label for="confirm_password">Confirmer</label>
             <input type="password" name="confirm_password" id="confirm_password" minlength="8" required>
           </div>
         </div>
 
-        <div class="inline" style="margin-top:4px;">
-          <button class="btn btn-warning" type="submit">Mettre à jour</button>
-          <span class="muted">Minimum 8 caractères.</span>
+        <div class="inline">
+          <button class="btn btn-warning" type="submit">Mettre a jour</button>
+          <span class="hint">Minimum 8 caracteres.</span>
         </div>
       </form>
 
-      <hr style="margin:14px 0;border:none;border-top:1px solid var(--bd);">
-      <h3 style="margin:0 0 6px;">Aide rapide</h3>
+      <hr>
+      <h3>Aide rapide</h3>
       <ul class="help-list">
-        <li><span class="role-pill">Administrateur</span> : crée & supprime des comptes, change les rôles.</li>
-        <li><span class="role-pill">Utilisateur</span> : peut seulement modifier son propre mot de passe.</li>
-        <li>On ne peut pas supprimer le <strong>dernier administrateur</strong>, ni <strong>se supprimer soi-même</strong>.</li>
+        <li><span class="role-pill admin">Administrateur</span> cree et supprime des comptes, change les roles.</li>
+        <li><span class="role-pill">Utilisateur</span> peut seulement modifier son propre mot de passe.</li>
+        <li>On ne peut pas supprimer le <strong>dernier administrateur</strong>, ni <strong>se supprimer soi-meme</strong>.</li>
       </ul>
     </section>
+
   </div><!-- /grid-2 -->
 
-  <!-- ====== Liste des comptes (sans colonne ID) ====== -->
-  <section id="liste" class="card full" style="margin-top:18px;">
+  <!-- ====== Liste des comptes ====== -->
+  <section id="liste" class="card full mt-3">
     <h2>Comptes existants</h2>
-    <div class="muted" style="margin-top:-6px">Filtrez par identifiant. Les actions avancées sont réservées aux administrateurs.</div>
+    <div class="subtitle">Filtrez par identifiant. Les actions avancees sont reservees aux administrateurs.</div>
 
-    <form method="get" action="gestion_comptes.php" class="filter-bar inline" style="gap:10px; align-items:end; margin:14px 0;">
-      <div class="spacer" style="max-width:420px;">
-        <label for="f-search" class="muted" style="margin:0 0 4px; font-weight:600;">Recherche</label>
-        <input id="f-search" type="text" name="search" placeholder="Nom d'utilisateur…" value="<?= e($search) ?>">
+    <form method="get" action="gestion_comptes.php" class="inline mt-3">
+      <div class="search-field">
+        <label for="f-search" class="sr-only">Recherche</label>
+        <input id="f-search" type="text" name="search" placeholder="Nom d'utilisateur..." value="<?= e($search) ?>">
       </div>
-      <button type="submit" class="btn btn-primary">Rechercher</button>
+      <button type="submit" class="btn btn-primary btn-sm">Rechercher</button>
       <?php if ($search !== ''): ?>
-        <a href="gestion_comptes.php" class="btn btn-secondary">Réinitialiser</a>
+        <a href="gestion_comptes.php" class="btn btn-secondary btn-sm">Reinitialiser</a>
       <?php endif; ?>
     </form>
 
-    <div class="table-wrap">
+    <div class="table-wrap table-responsive">
       <table class="table-sticky">
         <thead>
           <tr>
             <th>Utilisateur</th>
-            <th style="width:220px;">Rôle</th>
-            <th style="width:180px;">Créé le</th>
-            <th style="width:200px;">Dernière connexion</th>
-            <th style="width:280px;">Actions</th>
+            <th>Role</th>
+            <th>Cree le</th>
+            <th>Derniere connexion</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
         <?php if (empty($users)): ?>
-          <tr><td colspan="5" class="muted">Aucun utilisateur.</td></tr>
+          <tr><td colspan="5">
+            <div class="empty-state">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <p>Aucun utilisateur</p>
+            </div>
+          </td></tr>
         <?php else: foreach ($users as $u): ?>
           <tr>
-            <td><strong><?= e($u['username']) ?></strong></td>
-            <td>
+            <td data-label="Utilisateur">
+              <strong><?= e($u['username']) ?></strong>
+              <?php if ((int)$u['id'] === $meId): ?>
+                <span class="badge">vous</span>
+              <?php endif; ?>
+            </td>
+            <td data-label="Role">
               <?php if ($isAdmin): ?>
-                <form method="post" class="inline" style="gap:6px; align-items:center;">
+                <form method="post" class="inline">
                   <input type="hidden" name="csrf_token" value="<?= e($_SESSION['csrf_token']) ?>">
                   <input type="hidden" name="action" value="change_role">
                   <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
-                  <select name="role">
+                  <select name="role" class="role-select">
                     <option value="user"  <?= $u['role']==='user'  ? 'selected':''; ?>>Utilisateur</option>
                     <option value="admin" <?= $u['role']==='admin' ? 'selected':''; ?>>Administrateur</option>
                   </select>
-                  <button class="btn" type="submit">Appliquer</button>
+                  <button class="btn btn-sm btn-ghost" type="submit">Appliquer</button>
                 </form>
               <?php else: ?>
-                <span class="role-pill"><?= e(ucfirst($u['role'])) ?></span>
+                <span class="role-pill<?= $u['role'] === 'admin' ? ' admin' : '' ?>"><?= e(ucfirst($u['role'])) ?></span>
               <?php endif; ?>
             </td>
-            <td><?= $u['created_at'] ? e(date('d/m/Y H:i', strtotime($u['created_at']))) : '—' ?></td>
-            <td><?= $u['last_login'] ? e(date('d/m/Y H:i', strtotime($u['last_login']))) : '—' ?></td>
-            <td class="actions">
-              <button class="btn" onclick="prefillPass(<?= (int)$u['id'] ?>)">Init. mot de passe…</button>
-              <?php if ($isAdmin): ?>
-                <form method="post" onsubmit="return confirmSuppression(this);" style="display:inline;">
-                  <input type="hidden" name="csrf_token" value="<?= e($_SESSION['csrf_token']) ?>">
-                  <input type="hidden" name="action" value="delete">
-                  <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
-                  <button class="btn btn-danger" type="submit" <?= ((int)$u['id']===$meId)?'disabled':''; ?>>Supprimer</button>
-                </form>
-              <?php endif; ?>
+            <td data-label="Cree le" class="nowrap"><?= $u['created_at'] ? e(date('d/m/Y H:i', strtotime($u['created_at']))) : '<span class="muted">&mdash;</span>' ?></td>
+            <td data-label="Connexion" class="nowrap"><?= $u['last_login'] ? e(date('d/m/Y H:i', strtotime($u['last_login']))) : '<span class="muted">&mdash;</span>' ?></td>
+            <td data-label="Actions" class="actions">
+              <div class="inline">
+                <button class="btn btn-sm btn-secondary" onclick="prefillPass(<?= (int)$u['id'] ?>)">Init. mot de passe</button>
+                <?php if ($isAdmin): ?>
+                  <form method="post" onsubmit="return confirmSuppression(this);" class="inline">
+                    <input type="hidden" name="csrf_token" value="<?= e($_SESSION['csrf_token']) ?>">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
+                    <button class="btn btn-sm btn-danger" type="submit" <?= ((int)$u['id']===$meId)?'disabled':''; ?>>Supprimer</button>
+                  </form>
+                <?php endif; ?>
+              </div>
             </td>
           </tr>
         <?php endforeach; endif; ?>
@@ -501,10 +559,10 @@ try {
       </table>
     </div>
 
-    <p class="muted" style="margin-top:8px;">
-      Garde-fous : impossible de supprimer le <strong>dernier administrateur</strong> ni de <strong>se supprimer soi-même</strong>.
-      <?php if(!$isAdmin): ?> — Les changements de rôle et suppressions sont réservés aux administrateurs.<?php endif; ?>
-    </p>
+    <div class="hint mt-3">
+      Garde-fous : impossible de supprimer le <strong>dernier administrateur</strong> ni de <strong>se supprimer soi-meme</strong>.
+      <?php if(!$isAdmin): ?> &mdash; Les changements de role et suppressions sont reserves aux administrateurs.<?php endif; ?>
+    </div>
   </section>
 </div>
 
@@ -520,12 +578,15 @@ function prefillPass(id){
   if (np) np.focus();
 }
 function confirmSuppression(formEl){
+  event.preventDefault();
   const uid = formEl.querySelector('input[name="user_id"]')?.value || '';
   const row = formEl.closest('tr');
   const uname = row ? row.children[0].textContent.trim() : '';
-  return confirm("Supprimer le compte « " + (uname || ("ID " + uid)) + " » ? Cette action est irréversible.");
+  confirmAction('Supprimer le compte \u00ab ' + (uname || ('ID ' + uid)) + ' \u00bb ? Cette action est irreversible.', function(){ formEl.submit(); }, {title:'Suppression du compte', confirmText:'Supprimer', danger:true});
 }
 </script>
 
+<?php require __DIR__ . '/inc/toast.php'; ?>
+<?php require __DIR__ . '/inc/modal.php'; ?>
 </body>
 </html>

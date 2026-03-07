@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-card">
         <div class="logo-area">
             <?php if (file_exists(__DIR__ . '/assets/logo.jpeg')): ?>
-                <img src="assets/logo.jpeg" alt="Logo" width="48" height="48" style="margin:0 auto;border-radius:var(--r-sm);">
+                <img src="assets/logo.jpeg" alt="Logo" width="52" height="52" class="login-logo">
             <?php endif; ?>
             <h1>Climatisation</h1>
             <p>Connectez-vous pour acceder a votre espace</p>
@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="error"><?= h($message) ?></div>
         <?php endif; ?>
 
-        <form method="POST" action="" autocomplete="off">
+        <form method="POST" action="" autocomplete="off" novalidate>
             <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
 
             <div class="form-group">
@@ -97,28 +97,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                            placeholder="Votre mot de passe">
                     <button type="button" class="password-toggle" id="togglePwd" aria-label="Afficher le mot de passe">
                         <svg id="eyeOpen" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
-                        <svg id="eyeClosed" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+                        <svg id="eyeClosed" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="hidden"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
                     </button>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;margin-top:8px;">Se connecter</button>
+            <button type="submit" class="btn btn-primary login-submit">Se connecter</button>
         </form>
     </div>
 </div>
 
 <script>
 (function(){
-    const btn = document.getElementById('togglePwd');
-    const pw = document.getElementById('password');
-    const eyeOpen = document.getElementById('eyeOpen');
-    const eyeClosed = document.getElementById('eyeClosed');
+    var btn = document.getElementById('togglePwd');
+    var pw = document.getElementById('password');
+    var eyeOpen = document.getElementById('eyeOpen');
+    var eyeClosed = document.getElementById('eyeClosed');
     if (btn && pw) {
         btn.addEventListener('click', function(){
-            const show = pw.type === 'password';
+            var show = pw.type === 'password';
             pw.type = show ? 'text' : 'password';
-            eyeOpen.style.display = show ? 'none' : '';
-            eyeClosed.style.display = show ? '' : 'none';
+            eyeOpen.classList.toggle('hidden', show);
+            eyeClosed.classList.toggle('hidden', !show);
+        });
+    }
+
+    function clearErr(input) {
+        input.classList.remove('field-error');
+        var msg = input.parentNode.querySelector('.field-error-msg');
+        if (msg) msg.remove();
+    }
+    function setErr(input, message) {
+        clearErr(input);
+        input.classList.add('field-error');
+        var el = document.createElement('span');
+        el.className = 'field-error-msg';
+        el.textContent = message;
+        input.parentNode.appendChild(el);
+    }
+
+    var form = document.querySelector('form[method="POST"]');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            var u = document.getElementById('username');
+            var p = document.getElementById('password');
+            var valid = true;
+            if (!u.value.trim()) { setErr(u, 'Veuillez saisir votre identifiant.'); valid = false; } else { clearErr(u); }
+            if (!p.value) { setErr(p, 'Veuillez saisir votre mot de passe.'); valid = false; } else { clearErr(p); }
+            if (!valid) e.preventDefault();
+        });
+        ['username','password'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', function() { clearErr(el); });
         });
     }
 })();

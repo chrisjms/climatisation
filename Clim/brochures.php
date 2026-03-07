@@ -15,6 +15,27 @@ function formatBytes($size, $precision = 2){
     return round(pow(1024, $base - floor($base)), $precision) . ' ' . $suffixes[(int)floor($base)];
 }
 
+function mime_badge(string $mime): string {
+    if ($mime === '') return '<span class="badge neutral">Autre</span>';
+    if ($mime === 'application/pdf') return '<span class="badge danger">PDF</span>';
+    if (strpos($mime, 'image/') === 0) return '<span class="badge success">Image</span>';
+    if (strpos($mime, 'wordprocessingml') !== false) return '<span class="badge">DOCX</span>';
+    if (strpos($mime, 'presentationml') !== false) return '<span class="badge warning">PPTX</span>';
+    return '<span class="badge neutral">Autre</span>';
+}
+
+function sort_link(string $col, string $currentSort, string $q, string $dateMin, string $dateMax): string {
+    $isAsc  = ($currentSort === $col . '_asc');
+    $target = $isAsc ? $col . '_desc' : $col . '_asc';
+    $params = http_build_query(array_filter([
+        'q' => $q, 'from' => $dateMin, 'to' => $dateMax, 'sort' => $target,
+    ], function($v){ return $v !== ''; }));
+    $class = 'th-sort';
+    if ($currentSort === $col . '_asc')  $class .= ' th-sort-asc';
+    if ($currentSort === $col . '_desc') $class .= ' th-sort-desc';
+    return 'class="' . $class . '" href="brochures.php?' . htmlspecialchars($params, ENT_QUOTES, 'UTF-8') . '"';
+}
+
 /* ───────────────────── Paramètres ───────────────────── */
 $action  = $_GET['action'] ?? 'list';
 $id      = (isset($_GET['id']) && ctype_digit($_GET['id'])) ? (int)$_GET['id'] : null;
@@ -60,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'upload' || $action ==
     $csrf = $_POST['csrf'] ?? '';
     if (!hash_equals($_SESSION['csrf_token'], $csrf)) {
         http_response_code(403);
-        exit('Jeton CSRF invalide pour l'upload.');
+        exit('Jeton CSRF invalide pour l\'upload.');
     }
 
     $titre       = trim($_POST['titre'] ?? '');
@@ -238,13 +259,11 @@ $countRows = count($rows);
     </div>
   </div>
 
-  <?php if (!empty($message)): ?>
-    <div class="flash"><?= h($message) ?></div>
-  <?php endif; ?>
+  <?php $toastMsg = $message ?? ''; ?>
   <?php if (!empty($errors)): ?>
     <div class="error">
       <strong>Erreur :</strong>
-      <ul style="margin:6px 0 0 18px;">
+      <ul>
         <?php foreach ($errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?>
       </ul>
     </div>
@@ -254,9 +273,10 @@ $countRows = count($rows);
   <div class="cards-2">
 
     <!-- ───────────── 1) Ajout d'une brochure ───────────── -->
-    <section id="upload" class="card">
+    <section id="upload" class="card upload-drop-zone">
+      <div class="drop-hint">Deposez le fichier ici</div>
       <h2>Ajouter une brochure</h2>
-      <p class="muted" style="margin-top:-6px">Formats acceptés : PDF, JPG, PNG, WEBP, DOCX, PPTX — 30&nbsp;Mo max.</p>
+      <p class="muted">Formats acceptes : PDF, JPG, PNG, WEBP, DOCX, PPTX — 30&nbsp;Mo max. Vous pouvez aussi glisser-deposer un fichier.</p>
 
       <form method="post" enctype="multipart/form-data" action="brochures.php?action=upload" class="stack">
         <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf_token']) ?>">
@@ -271,8 +291,8 @@ $countRows = count($rows);
           <textarea id="description" name="description" rows="3"><?= h($_POST['description'] ?? '') ?></textarea>
         </div>
 
-        <div class="inline" style="gap:12px;">
-          <div style="min-width:180px;">
+        <div class="inline">
+          <div class="form-group">
             <label for="date_ajout">Date (optionnelle)</label>
             <input type="date" id="date_ajout" name="date_ajout" value="<?= h($_POST['date_ajout'] ?? date('Y-m-d')) ?>">
           </div>
@@ -289,11 +309,30 @@ $countRows = count($rows);
         </div>
       </form>
     </section>
+    <script>
+    (function(){
+      var zone = document.getElementById('upload');
+      var input = document.getElementById('brochure');
+      if (!zone || !input) return;
+      var counter = 0;
+      zone.addEventListener('dragenter', function(e){ e.preventDefault(); counter++; zone.classList.add('drag-active'); });
+      zone.addEventListener('dragover', function(e){ e.preventDefault(); });
+      zone.addEventListener('dragleave', function(e){ e.preventDefault(); counter--; if(counter<=0){counter=0; zone.classList.remove('drag-active');} });
+      zone.addEventListener('drop', function(e){
+        e.preventDefault(); counter=0; zone.classList.remove('drag-active');
+        if(e.dataTransfer.files.length){
+          input.files = e.dataTransfer.files;
+          var label = zone.querySelector('label[for="brochure"]');
+          if(label) label.innerHTML = '<strong>Fichier : ' + e.dataTransfer.files[0].name + '</strong>';
+        }
+      });
+    })();
+    </script>
 
     <!-- ───────────── 2) Filtres / tri ───────────── -->
     <section id="filtres" class="card">
-      <h2>🔎 Filtres & tri</h2>
-      <p class="muted" style="margin-top:-6px">Affinez l'affichage par mots-clés et dates, puis choisissez l'ordre de tri.</p>
+      <h2>Filtres & tri</h2>
+      <p class="muted">Affinez l'affichage par mots-clés et dates, puis choisissez l'ordre de tri.</p>
 
       <form method="get" class="stack">
         <div>
@@ -301,12 +340,12 @@ $countRows = count($rows);
           <input type="text" id="q" name="q" value="<?= h($q) ?>" placeholder="Titre, description">
         </div>
 
-        <div class="inline" style="gap:12px;">
-          <div style="min-width:160px;">
+        <div class="inline">
+          <div class="form-group">
             <label for="from">Du</label>
             <input type="date" id="from" name="from" value="<?= h($dateMin) ?>">
           </div>
-          <div style="min-width:160px;">
+          <div class="form-group">
             <label for="to">Au</label>
             <input type="date" id="to" name="to" value="<?= h($dateMax) ?>">
           </div>
@@ -326,7 +365,7 @@ $countRows = count($rows);
           </select>
         </div>
 
-        <div class="inline" style="gap:8px;">
+        <div class="inline">
           <button type="submit" class="btn btn-primary">Appliquer</button>
           <a class="btn btn-secondary" href="brochures.php">Réinitialiser</a>
         </div>
@@ -335,10 +374,21 @@ $countRows = count($rows);
 
   </div><!-- /.cards-2 -->
 
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+    </div>
+    <div>
+      <div class="stat-label">Brochures</div>
+      <div class="stat-value"><?= (int)$countRows ?></div>
+      <div class="stat-sub">documents enregistres</div>
+    </div>
+  </div>
+
   <!-- ───────────── 3) Listing ───────────── -->
-  <section id="listing" class="card" style="margin-top:18px;">
+  <section id="listing" class="card mt-3">
     <h2>Brochures enregistrees</h2>
-    <div class="file-pills muted" style="margin-top:-6px">
+    <div class="file-pills muted">
       <span class="pill">Résultats : <strong><?= (int)$countRows ?></strong></span>
       <?php if ($q !== ''): ?><span class="pill">Recherche : "<?= h($q) ?>"</span><?php endif; ?>
       <?php if ($dateMin): ?><span class="pill">Du : <?= h($dateMin) ?></span><?php endif; ?>
@@ -349,14 +399,14 @@ $countRows = count($rows);
       <table class="table-sticky">
         <thead>
           <tr>
-            <th style="width:110px;">Prévisualisation</th>
-            <th style="min-width:180px;">Titre</th>
+            <th>Previsualisation</th>
+            <th><a <?= sort_link('titre', $sort, $q, $dateMin, $dateMax) ?>>Titre</a></th>
             <th>Description</th>
-            <th style="width:110px;">Date</th>
-            <th style="width:120px;">Type</th>
-            <th style="width:110px; text-align:right">Taille</th>
-            <th style="width:160px;">Fichier</th>
-            <th style="width:140px;">Actions</th>
+            <th><a <?= sort_link('date', $sort, $q, $dateMin, $dateMax) ?>>Date</a></th>
+            <th><a <?= sort_link('type', $sort, $q, $dateMin, $dateMax) ?>>Type</a></th>
+            <th class="text-right"><a <?= sort_link('taille', $sort, $q, $dateMin, $dateMax) ?>>Taille</a></th>
+            <th>Fichier</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -378,30 +428,30 @@ $countRows = count($rows);
               <?php if ($isImg && $fileOk): ?>
                 <img class="preview" src="<?= h($fileUrl) ?>" alt="aperçu">
               <?php elseif ($isPdf): ?>
-                <span class="badge">PDF</span>
+                <span class="badge danger">PDF</span>
               <?php else: ?>
-                <span class="muted">—</span>
+                <?= mime_badge($r['mime_type'] ?? '') ?>
               <?php endif; ?>
             </td>
             <td><strong><?= h($r['titre'] ?? '') ?></strong></td>
             <td>
               <?= nl2br(h($r['description'] ?? '')) ?: '<span class="muted">—</span>' ?>
               <details class="edit">
-                <summary>✏️ Modifier</summary>
+                <summary>Modifier</summary>
                 <form method="post" action="<?= h($updateUrl) ?>">
                   <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf_token']) ?>">
                   <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
                   <textarea name="description" rows="4" placeholder="Saisissez la description…"><?= h($r['description'] ?? '') ?></textarea>
                   <div class="row">
-                    <button type="submit" class="save">💾 Enregistrer</button>
+                    <button type="submit" class="save">Enregistrer</button>
                     <button type="button" class="cancel" onclick="this.closest('details').removeAttribute('open')">Annuler</button>
                   </div>
                 </form>
               </details>
             </td>
             <td><?= $r['date_ajout'] ? date('d/m/Y', strtotime($r['date_ajout'])) : '<span class="muted">—</span>' ?></td>
-            <td><?= h($r['mime_type'] ?? '—') ?></td>
-            <td style="text-align:right"><?= $r['taille_octets'] !== null ? h(formatBytes((int)$r['taille_octets'])) : '—' ?></td>
+            <td><?= mime_badge($r['mime_type'] ?? '') ?></td>
+            <td class="text-right"><?= $r['taille_octets'] !== null ? h(formatBytes((int)$r['taille_octets'])) : '—' ?></td>
             <td class="actions">
               <?php if ($fileOk): ?>
                 <a class="btn btn-primary" href="<?= h($fileUrl) ?>" target="_blank" rel="noopener">Voir</a>
@@ -413,7 +463,7 @@ $countRows = count($rows);
             <td class="actions">
               <a class="btn btn-danger"
                  href="?action=delete&id=<?= (int)$r['id'] ?>&<?= h(http_build_query(['q'=>$q,'from'=>$dateMin,'to'=>$dateMax,'sort'=>$sort,'csrf'=>$_SESSION['csrf_token']])) ?>"
-                 onclick="return confirm('Supprimer cette brochure ? Le fichier sera aussi supprimé.');">🗑️ Supprimer</a>
+                 onclick="event.preventDefault(); var u=this.href; confirmAction('Supprimer cette brochure ? Le fichier sera aussi supprime.', function(){ location.href=u; }, {title:'Suppression', confirmText:'Supprimer', danger:true})">Supprimer</a>
             </td>
           </tr>
         <?php endforeach; endif; ?>
@@ -424,5 +474,7 @@ $countRows = count($rows);
 
 </div><!-- /.main -->
 
+<?php require __DIR__ . '/inc/toast.php'; ?>
+<?php require __DIR__ . '/inc/modal.php'; ?>
 </body>
 </html>

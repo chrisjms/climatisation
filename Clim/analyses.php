@@ -225,7 +225,7 @@ $badgeText = match ($view) {
     'day'   => 'Périmètre : '.DAY_WINDOW.' derniers jours',
     'month' => 'Périmètre : '.MONTH_WINDOW.' mois glissants',
     'year'  => 'Périmètre : '.YEAR_WINDOW.' dernières années',
-    'all'   => 'Périmètre : tout l'historique',
+    'all'   => 'Périmètre : tout l\'historique',
 };
 
 /* Texte pour titres */
@@ -247,86 +247,145 @@ $granularityText = granularityText($view === 'all' ? 'year' : $view);
 <body>
 <?php require __DIR__ . '/inc/sidebar.php'; ?>
 
-
 <div class="main">
+
+    <!-- Page Header -->
     <div class="page-header">
-      <div>
-        <h1>Analyses & rapports</h1>
-        <div class="subtitle">Statistiques et indicateurs de performance</div>
-      </div>
+        <div>
+            <h1>Analyses & rapports</h1>
+            <div class="subtitle">Suivi de l'activite, chiffre d'affaires et indicateurs cles de performance</div>
+        </div>
     </div>
 
+    <!-- View Tabs -->
     <div class="toolbar">
         <div class="view-tabs">
-            <a href="analyses.php?view=day" class="view-tab <?= $view==='day' ? 'active' : '' ?>">Jours</a>
-            <a href="analyses.php?view=month" class="view-tab <?= $view==='month' ? 'active' : '' ?>">Mois</a>
-            <a href="analyses.php?view=year" class="view-tab <?= $view==='year' ? 'active' : '' ?>">Annees</a>
-            <a href="analyses.php?view=all" class="view-tab <?= $view==='all' ? 'active' : '' ?>">Historique</a>
+            <a href="analyses.php?view=day" class="view-tab <?= $view === 'day' ? 'active' : '' ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+                Jours
+            </a>
+            <a href="analyses.php?view=month" class="view-tab <?= $view === 'month' ? 'active' : '' ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/></svg>
+                Mois
+            </a>
+            <a href="analyses.php?view=year" class="view-tab <?= $view === 'year' ? 'active' : '' ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                Annees
+            </a>
+            <a href="analyses.php?view=all" class="view-tab <?= $view === 'all' ? 'active' : '' ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                Historique
+            </a>
         </div>
-        <span class="badge"><?= htmlspecialchars($badgeText) ?></span>
     </div>
 
+    <!-- Scope Summary Banner -->
+    <div class="card scope-banner">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="muted scope-text"><?= htmlspecialchars($badgeText) ?></span>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <?php
+    $years = $turnover['years'];   // [year => total_ttc]
+    $total5 = $turnover['total5'];
+    $totalAll = $turnover['totalAll'];
+    ?>
+    <div class="kpi-grid">
+        <div class="stat-card green">
+            <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+            </div>
+            <div>
+                <div class="stat-label">Total 5 ans (TTC)</div>
+                <div class="stat-value"><?= euro($total5) ?></div>
+                <div class="stat-sub">Chiffre d'affaires factures</div>
+            </div>
+        </div>
+        <div class="stat-card purple">
+            <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+            </div>
+            <div>
+                <div class="stat-label">Total global (TTC)</div>
+                <div class="stat-value"><?= euro($totalAll) ?></div>
+                <div class="stat-sub">Tout l'historique</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <div>
+                <div class="stat-label">Devis (periode)</div>
+                <div class="stat-value"><?= array_sum($countDevis) ?></div>
+                <div class="stat-sub"><?= euro(array_sum($totalDevis)) ?> TTC</div>
+            </div>
+        </div>
+        <div class="stat-card orange">
+            <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+            </div>
+            <div>
+                <div class="stat-label">Factures (periode)</div>
+                <div class="stat-value"><?= array_sum($countFactures) ?></div>
+                <div class="stat-sub"><?= euro(array_sum($totalFactures)) ?> TTC</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
     <div class="grid">
 
-        <!-- Cartes Graphiques -->
         <div class="card">
-            <h3>Nombre de devis (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l'historique' : '' ?>)</h3>
+            <h3>Nombre de devis <?= htmlspecialchars($granularityText) ?><?= $view === 'all' ? ' — tout l\'historique' : '' ?></h3>
             <canvas id="chartCountDevis"></canvas>
         </div>
 
         <div class="card">
-            <h3>Nombre de factures (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l'historique' : '' ?>)</h3>
+            <h3>Nombre de factures <?= htmlspecialchars($granularityText) ?><?= $view === 'all' ? ' — tout l\'historique' : '' ?></h3>
             <canvas id="chartCountFactures"></canvas>
         </div>
 
         <div class="card">
-            <h3>Montant TTC des devis (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l'historique' : '' ?>)</h3>
+            <h3>Montant TTC des devis <?= htmlspecialchars($granularityText) ?><?= $view === 'all' ? ' — tout l\'historique' : '' ?></h3>
             <canvas id="chartTotalDevis"></canvas>
         </div>
 
         <div class="card">
-            <h3>Montant TTC des factures (<?= htmlspecialchars($granularityText) ?><?= $view==='all' ? ' — tout l'historique' : '' ?>)</h3>
+            <h3>Montant TTC des factures <?= htmlspecialchars($granularityText) ?><?= $view === 'all' ? ' — tout l\'historique' : '' ?></h3>
             <canvas id="chartTotalFactures"></canvas>
         </div>
 
-        <!-- Chiffre d'affaires TTC (factures) -->
-        <div class="card full">
-            <h3>Chiffre d'affaires TTC (Factures)</h3>
+    </div>
 
-            <?php
-            $years = $turnover['years'];   // [year => total_ttc]
-            $total5 = $turnover['total5'];
-            $totalAll = $turnover['totalAll'];
-            ?>
-
+    <!-- Revenue Table -->
+    <div class="card full mt-3">
+        <h3>Chiffre d'affaires TTC par annee (Factures)</h3>
+        <div class="table-wrap">
             <table class="ca">
                 <thead>
                     <tr>
-                        <th>Année</th>
+                        <th>Annee</th>
                         <th>Chiffre d'affaires TTC</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($years as $yr => $val): ?>
                     <tr>
-                        <td><?= htmlspecialchars((string)$yr) ?></td>
-                        <td><?= euro($val) ?></td>
+                        <td class="mono"><?= htmlspecialchars((string)$yr) ?></td>
+                        <td class="mono"><?= euro($val) ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
-
-            <div class="kpi">
-                <span class="pill">Total 5 ans : <?= euro($total5) ?></span>
-                <span class="pill">Total global : <?= euro($totalAll) ?></span>
-            </div>
         </div>
-
     </div>
+
 </div>
 
 <script>
-/* Données PHP → JS */
+/* Donnees PHP -> JS */
 const labelsDevis     = <?= json_encode($labelsDevis, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
 const countDevis      = <?= json_encode($countDevis, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
 const totalDevis      = <?= json_encode($totalDevis, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
@@ -335,14 +394,14 @@ const labelsFactures  = <?= json_encode($labelsFactures, JSON_UNESCAPED_SLASHES|
 const countFactures   = <?= json_encode($countFactures, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
 const totalFactures   = <?= json_encode($totalFactures, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
 
-// Pour le formatage, on traite "all" comme une échelle annuelle
+// Pour le formatage, on traite "all" comme une echelle annuelle
 const currentView = <?= json_encode($view === 'all' ? 'year' : $view) ?>;
 
 function fmtLabel(label){
     // year: "2025"
     if (currentView === 'year') return label;
 
-    // month: "YYYY-MM" → "MM/YYYY"
+    // month: "YYYY-MM" -> "MM/YYYY"
     if (currentView === 'month') {
         if (/^\d{4}-\d{2}$/.test(label)) {
             const [y,m] = label.split('-');
@@ -351,7 +410,7 @@ function fmtLabel(label){
         return label;
     }
 
-    // day: "YYYY-MM-DD" → "DD/MM"
+    // day: "YYYY-MM-DD" -> "DD/MM"
     if (currentView === 'day') {
         if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
             const [y,m,d] = label.split('-');
@@ -428,7 +487,7 @@ function makeLineChart(ctxId, labels, data, title, isCurrency=false){
     });
 }
 
-// Création des graphiques
+// Creation des graphiques
 makeLineChart('chartCountDevis',    labelsDevis,    countDevis,   'Devis');
 makeLineChart('chartCountFactures', labelsFactures, countFactures,'Factures');
 makeLineChart('chartTotalDevis',    labelsDevis,    totalDevis,   'Total TTC devis', true);

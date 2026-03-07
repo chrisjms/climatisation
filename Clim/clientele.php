@@ -304,14 +304,33 @@ function normalize_phone_for_link($raw){
 <meta name="csrf-token" content="<?= h($_SESSION['csrf_token']) ?>">
 <link rel="stylesheet" href="style.css">
 <script>
-function filterClients(){
-    const search=document.getElementById("search").value.toLowerCase();
-    document.querySelectorAll(".client-item").forEach(li=>{
-        li.style.display=li.classList.contains('is-selected') && document.querySelector('.clients-panel')?.classList.contains('collapsed')
-          ? 'flex'
-          : (li.textContent.toLowerCase().includes(search)?"flex":"none");
+(function(){
+  var debounceTimer=null, searchInput, clearBtn, countEl, noResultsEl;
+  function filterClients(){
+    var search=searchInput.value.toLowerCase();
+    var items=document.querySelectorAll('.client-item');
+    var visible=0, isCollapsed=document.querySelector('.clients-panel')?.classList.contains('collapsed');
+    items.forEach(function(li){
+      if(isCollapsed&&li.classList.contains('is-selected')){li.style.display='flex';visible++;}
+      else if(li.textContent.toLowerCase().indexOf(search)!==-1){li.style.display='flex';visible++;}
+      else{li.style.display='none';}
     });
-}
+    if(countEl)countEl.textContent=visible+' client'+(visible!==1?'s':'')+' affiche'+(visible!==1?'s':'');
+    if(clearBtn)clearBtn.classList.toggle('visible',search.length>0);
+    if(noResultsEl)noResultsEl.classList.toggle('visible',visible===0&&search.length>0);
+  }
+  function debounced(){clearTimeout(debounceTimer);debounceTimer=setTimeout(filterClients,150);}
+  document.addEventListener('DOMContentLoaded',function(){
+    searchInput=document.getElementById('search');
+    clearBtn=document.getElementById('search-clear');
+    countEl=document.getElementById('search-count');
+    noResultsEl=document.getElementById('no-results');
+    if(searchInput){searchInput.addEventListener('input',debounced);}
+    if(clearBtn){clearBtn.addEventListener('click',function(){searchInput.value='';clearBtn.classList.remove('visible');filterClients();searchInput.focus();});}
+    if(searchInput&&searchInput.value)filterClients();
+  });
+  window.filterClients=function(){if(searchInput)filterClients();};
+})();
 </script>
 </head>
 <body>
@@ -321,6 +340,9 @@ function filterClients(){
 
   <div class="page-header">
     <div>
+      <?php if ($selected_client_id && !empty($client_infos)): ?>
+        <div class="breadcrumb"><a href="clientele.php">Clientele</a><span class="sep">&#8250;</span><span class="current"><?= htmlspecialchars($client_infos['prenom'] . ' ' . $client_infos['nom']) ?></span></div>
+      <?php endif; ?>
       <h1>Clientele</h1>
       <div class="subtitle">Gestion de vos clients et contacts</div>
     </div>
@@ -336,25 +358,24 @@ function filterClients(){
   <section id="recherche" class="card clients-panel <?= $selected_client_id ? 'collapsed' : '' ?>">
     <h2>Rechercher un client</h2>
 
-    <!-- Messages -->
-    <?php if (!empty($_GET['msg'])): ?>
-      <div class="alert success"><?= h($_GET['msg']) ?></div>
-    <?php endif; ?>
-    <?php if (!empty($_GET['err'])): ?>
-      <div class="alert error"><?= h($_GET['err']) ?></div>
-    <?php endif; ?>
+    <!-- Toasts auto-triggered from URL params by inc/toast.js -->
 
     <div class="client-search-bar">
       <input type="text" id="search" class="mono"
-             placeholder="Tapez un nom, prénom, numéro ou email… (Ctrl/Cmd+K)"
-             onkeyup="filterClients()" value="<?= h($search) ?>">
-      <a class="btn" href="ajout_client.php?retour=clientele.php">➕ Ajouter</a>
+             placeholder="Tapez un nom, prenom, numero ou email... (Ctrl/Cmd+K)"
+             value="<?= h($search) ?>">
+      <button type="button" id="search-clear" class="search-clear" aria-label="Effacer">&times;</button>
+      <a class="btn btn-primary" href="ajout_client.php?retour=clientele.php">Ajouter</a>
+    </div>
+    <div id="search-count"></div>
+    <div style="margin-bottom: var(--gap-2);">
+      <a href="export_clients_csv.php?q=<?= urlencode($search) ?>" class="btn btn-secondary">Exporter clients CSV</a>
     </div>
 
     <?php if ($selected_client_id): ?>
       <div class="list-hint">
         <span class="small-muted">Liste réduite au client sélectionné.</span>
-        <a class="btn btn-secondary" href="clientele.php#recherche" title="Afficher toute la liste">↩︎ Afficher toute la liste</a>
+        <a class="btn btn-secondary" href="clientele.php#recherche" title="Afficher toute la liste">Afficher toute la liste</a>
       </div>
     <?php endif; ?>
 
@@ -380,24 +401,28 @@ function filterClients(){
                 <span>
                     <strong><?= h(($c['nom'] ?? '').' '.($c['prenom'] ?? '')) ?></strong>
                     <?php if($phones): ?>
-                        <span class="pill">📞 <?= h(count($phones)) ?> n°</span>
+                        <span class="pill"><?= h(count($phones)) ?> n°</span>
                     <?php endif; ?>
                     <?php if($emails): ?>
-                        <span class="pill">📧 <?= h(count($emails)) ?> mail(s)</span>
+                        <span class="pill"><?= h(count($emails)) ?> mail(s)</span>
                     <?php endif; ?>
                 </span>
                 <span class="small-muted">
                     <?php if($phonesTxt): ?>
-                        📞 <?= h($phonesTxt) ?><?php if(count($phones) > 3): ?> …<?php endif; ?>&nbsp;&nbsp;
+                        <?= h($phonesTxt) ?><?php if(count($phones) > 3): ?> …<?php endif; ?>&nbsp;&nbsp;
                     <?php endif; ?>
                     <?php if($emailsTxt): ?>
-                        📧 <?= h($emailsTxt) ?><?php if(count($emails) > 2): ?> …<?php endif; ?>
+                        <?= h($emailsTxt) ?><?php if(count($emails) > 2): ?> …<?php endif; ?>
                     <?php else: ?>
-                        <span style="color:var(--muted)">email non renseigné</span>
+                        <span class="text-muted">email non renseigné</span>
                     <?php endif; ?>
                 </span>
             </li>
         <?php endforeach; ?>
+        <li id="no-results">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto var(--gap-3)"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <p>Aucun client ne correspond a votre recherche.</p>
+        </li>
     </ul>
   </section>
 
@@ -426,10 +451,10 @@ function filterClients(){
   ?>
 
   <!-- ============== 2) FICHE CLIENT ============== -->
-  <section id="fiche" class="card" style="margin-top:var(--gap-3);">
+  <section id="fiche" class="card mt-3">
     <div class="toolbar">
-      <h2 style="margin:0;">Fiche client</h2>
-      <a class="btn btn-secondary" href="clientele.php#recherche" title="Fermer la fiche">✖ Fermer la fiche</a>
+      <h2 class="mt-0 mb-0">Fiche client</h2>
+      <a class="btn btn-secondary" href="clientele.php#recherche" title="Fermer la fiche">Fermer la fiche</a>
     </div>
 
     <!-- En-tête client -->
@@ -437,13 +462,13 @@ function filterClients(){
       <div class="left">
         <div class="avatar"><?= h(initials($client_infos['prenom'] ?? '', $client_infos['nom'] ?? '')) ?></div>
         <div>
-          <div style="font-weight:700;font-size:var(--fs-16)"><?= h(($client_infos['nom'] ?? '').' '.($client_infos['prenom'] ?? '')) ?></div>
+          <div class="client-name"><?= h(($client_infos['nom'] ?? '').' '.($client_infos['prenom'] ?? '')) ?></div>
           <div class="small-muted">
             <?php if(!empty($client_infos['ville'])): ?><span class="badge"><?= h($client_infos['ville']) ?></span><?php endif; ?>
             <?php if(!empty($client_infos['code_postal'])): ?><span class="badge"><?= h($client_infos['code_postal']) ?></span><?php endif; ?>
             <?php if(!empty($client_infos['date_ajout'])): ?>
               <?php $da = $dateAjoutAff ?: $client_infos['date_ajout']; ?>
-              <span class="badge">Ajouté le <?= h($da) ?></span>
+              <span class="badge">Ajoute <span data-date="<?= date('Y-m-d', strtotime($client_infos['date_ajout'])) ?>"><?= h($da) ?></span></span>
             <?php endif; ?>
             <span class="badge"><?= count($documents) ?> docs</span>
             <span class="badge"><?= count($devis) ?> devis</span>
@@ -468,7 +493,7 @@ function filterClients(){
     </div>
 
     <!-- Onglets -->
-    <div class="tabs">
+    <div class="tabs tabs--pill">
       <button class="tab-btn" data-tab="coord">Coordonnées</button>
       <button class="tab-btn" data-tab="notes">Notes</button>
       <button class="tab-btn" data-tab="docs">Documents (<?= count($documents) ?>)</button>
@@ -482,56 +507,56 @@ function filterClients(){
       <div class="info-grid" id="coordGrid">
         <div class="info-card" id="cardCoord">
           <div class="toolbar">
-            <h4 style="margin:0">Coordonnées</h4>
+            <h4 class="mt-0 mb-0">Coordonnées</h4>
             <!-- Boutons côte à côte : Modifier + Supprimer -->
             <div class="inline">
               <button id="coordEditBtn" class="btn btn-ghost" type="button">Modifier</button>
               <form action="supprimer_client.php"
                     method="POST"
                     class="inline"
-                    onsubmit="return confirm('⚠️ Cette action supprimera aussi tous les documents et coordonnées du client. Confirmer la suppression ?');">
+                    onsubmit="event.preventDefault(); var f=this; confirmAction('Cette action supprimera aussi tous les documents et coordonnees du client. Confirmer la suppression ?', function(){ f.submit(); }, {title:'Suppression du client', confirmText:'Supprimer', danger:true})">
                 <input type="hidden" name="client_id" value="<?= (int)$selected_client_id ?>">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
                 <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
               </form>
             </div>
           </div>
-          <div id="coordView" style="margin-top:var(--gap-2)">
+          <div id="coordView" class="mt-2">
             <p><strong>Nom :</strong><br>
                <?= h(($client_infos['nom'] ?? '').' '.($client_infos['prenom'] ?? '')) ?></p>
 
             <p><strong>Téléphones (tous) :</strong><br>
               <?php if ($allPhones): ?>
-                <ul style="margin:4px 0 0 16px;padding:0">
+                <ul class="compact-list">
                   <?php foreach ($allPhones as $i=>$p): ?>
-                    <li style="margin:.15rem 0">
+                    <li>
                       <span class="mono"><?= h($p['phone']) ?></span>
-                      <?php if($i===0): ?><em style="color:var(--accent)"> (principal)</em><?php endif; ?>
-                      <?php if(!empty($p['label'])): ?> — <span style="color:var(--ink-secondary)"><?= h($p['label']) ?></span><?php endif; ?>
-                      <a class="icon-btn" style="margin-left:6px" href="tel:<?= h(preg_replace('/\s+/','',$p['phone'])) ?>" title="Appeler">📞</a>
-                      <button class="icon-btn copy" data-copy="<?= h($p['phone']) ?>" title="Copier">📋</button>
+                      <?php if($i===0): ?><em class="text-accent"> (principal)</em><?php endif; ?>
+                      <?php if(!empty($p['label'])): ?> — <span class="text-secondary"><?= h($p['label']) ?></span><?php endif; ?>
+                      <a class="icon-btn" href="tel:<?= h(preg_replace('/\s+/','',$p['phone'])) ?>" title="Appeler">Appeler</a>
+                      <button class="icon-btn copy" data-copy="<?= h($p['phone']) ?>" title="Copier">Copier</button>
                     </li>
                   <?php endforeach; ?>
                 </ul>
               <?php else: ?>
-                <span style="color:var(--muted)">Aucun numéro</span>
+                <span class="text-muted">Aucun numéro</span>
               <?php endif; ?>
             </p>
 
             <p><strong>E-mails (tous) :</strong><br>
               <?php if ($allEmails): ?>
-                <ul style="margin:4px 0 0 16px;padding:0">
+                <ul class="compact-list">
                   <?php foreach ($allEmails as $i=>$m): ?>
-                    <li style="margin:.15rem 0">
+                    <li>
                       <a class="mono" href="mailto:<?= h($m['email']) ?>"><?= h($m['email']) ?></a>
-                      <?php if($i===0): ?><em style="color:var(--accent)"> (principal)</em><?php endif; ?>
-                      <?php if(!empty($m['label'])): ?> — <span style="color:var(--ink-secondary)"><?= h($m['label']) ?></span><?php endif; ?>
-                      <button class="icon-btn copy" data-copy="<?= h($m['email']) ?>" title="Copier">📋</button>
+                      <?php if($i===0): ?><em class="text-accent"> (principal)</em><?php endif; ?>
+                      <?php if(!empty($m['label'])): ?> — <span class="text-secondary"><?= h($m['label']) ?></span><?php endif; ?>
+                      <button class="icon-btn copy" data-copy="<?= h($m['email']) ?>" title="Copier">Copier</button>
                     </li>
                   <?php endforeach; ?>
                 </ul>
               <?php else: ?>
-                <span style="color:var(--muted)">Aucun e-mail</span>
+                <span class="text-muted">Aucun e-mail</span>
               <?php endif; ?>
             </p>
 
@@ -541,7 +566,7 @@ function filterClients(){
               <?php elseif (!empty($client_infos['date_ajout'])): ?>
                 <span class="mono"><?= h($client_infos['date_ajout']) ?></span>
               <?php else: ?>
-                <span style="color:var(--muted)">Non renseignée</span>
+                <span class="text-muted">Non renseignée</span>
               <?php endif; ?>
             </p>
 
@@ -561,15 +586,15 @@ function filterClients(){
         <!-- Formulaire Édition (MASQUÉ par défaut) -->
         <div class="info-card" id="coordEditCard">
           <div class="toolbar">
-            <h4 style="margin:0">Modifier</h4>
+            <h4 class="mt-0 mb-0">Modifier</h4>
             <button id="coordCancelBtn" class="btn btn-secondary" type="button">Annuler</button>
           </div>
 
           <!-- === FORMULAIRE D'ÉDITION (séparé) === -->
-          <form id="coordForm" action="update_client.php" method="POST" style="margin-top:var(--gap-2)">
+          <form id="coordForm" action="update_client.php" method="POST" class="mt-2">
             <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
             <input type="hidden" name="client_id" value="<?= (int)$client_infos['id'] ?>">
-            <!-- 🔁 RETOUR : rester sur le même client, onglet Coordonnées -->
+            <!-- RETOUR : rester sur le même client, onglet Coordonnées -->
             <input type="hidden" name="retour" value="clientele.php?client_id=<?= (int)$client_infos['id'] ?>#fiche&tab=coord">
 
             <div class="row-grid">
@@ -588,15 +613,15 @@ function filterClients(){
               <div class="full">
                 <label>Téléphones <small>(le premier sera le principal)</small></label>
                 <div id="phonesWrap"></div>
-                <button type="button" class="btn btn-primary btn-sm" style="margin-top:6px" id="addPhoneBtn">+ Ajouter un téléphone</button>
-                <div class="small-muted">Astuce : "⬆ Principal" remonte la ligne en première position.</div>
+                <button type="button" class="btn btn-primary btn-sm" id="addPhoneBtn">+ Ajouter un téléphone</button>
+                <div class="small-muted">Astuce : "Principal" remonte la ligne en première position.</div>
               </div>
 
               <!-- Emails multiples -->
               <div class="full">
                 <label>E-mails <small>(le premier sera le principal)</small></label>
                 <div id="emailsWrap"></div>
-                <button type="button" class="btn btn-primary btn-sm" style="margin-top:6px" id="addEmailBtn">+ Ajouter un e-mail</button>
+                <button type="button" class="btn btn-primary btn-sm" id="addEmailBtn">+ Ajouter un e-mail</button>
               </div>
 
               <!-- Adresse / CP / Ville -->
@@ -629,7 +654,7 @@ function filterClients(){
               </div>
             </div>
 
-            <div class="inline" style="margin-top:var(--gap-2)">
+            <div class="inline mt-2">
               <button class="btn btn-save" type="submit">Enregistrer</button>
             </div>
           </form>
@@ -661,8 +686,8 @@ function filterClients(){
         </div>
 
         <div class="notes-toolbar">
-          <button id="editNotes" class="icon-btn" title="Modifier">✏️</button>
-          <form action="export_notes_pdf.php" method="POST" class="inline" style="margin:0">
+          <button id="editNotes" class="icon-btn" title="Modifier">Modifier</button>
+          <form action="export_notes_pdf.php" method="POST" class="inline">
             <input type="hidden" name="client_id" value="<?= (int)$selected_client_id ?>">
             <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
             <button type="submit" class="icon-btn" title="Exporter les notes en PDF">PDF</button>
@@ -686,24 +711,23 @@ function filterClients(){
             <!-- Type = champ texte libre -->
             <label>Type de document<br><input type="text" name="type" placeholder="photo / devis / entretien" required></label>
           </div>
-          <div class="row" style="margin-top:8px">
+          <div class="row mt-2">
             <label>Fichier<br><input type="file" name="file" required></label>
-            <!-- Saisie de la date métier -->
             <label>Date du document (affichée)<br><input type="date" name="document_date" placeholder="YYYY-MM-DD"></label>
           </div>
-          <button type="submit" class="btn btn-primary" style="margin-top:var(--gap-2)">Uploader</button>
-          <div class="hint" style="margin-top:6px">
+          <button type="submit" class="btn btn-primary mt-2">Uploader</button>
+          <div class="hint mt-2">
             La date ci-dessus (si fournie) sera enregistrée dans <code>client_documents</code> (colonne détectée
             automatiquement, ex. <code>document_date</code>). Si aucune colonne n'existe, elle sera créée.
           </div>
         </form>
       </div>
 
-      <h3 style="margin:var(--gap-2) 0">Documents du client <span class="small-muted">— du plus ancien au plus récent</span></h3>
+      <h3 class="mt-2">Documents du client <span class="small-muted">— du plus ancien au plus récent</span></h3>
       <?php if ($documents): ?>
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="text-align:left;padding:8px">Nom</th><th>Type</th><th>Date</th><th>Fichier</th><th>Actions</th></tr></thead>
+            <thead><tr><th class="text-left">Nom</th><th>Type</th><th>Date</th><th>Fichier</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($documents as $doc):
               $docDate = '';
@@ -713,18 +737,18 @@ function filterClients(){
               }
             ?>
               <tr>
-                <td class="mono" style="padding:6px 8px"><?= h($doc['nom'] ?: basename((string)$doc['file_path'])) ?></td>
-                <td style="text-align:center"><?= h($doc['type']) ?></td>
-                <td style="text-align:center"><?= h($docDate ?: '—') ?></td>
-                <td style="text-align:center">
+                <td class="mono"><?= h($doc['nom'] ?: basename((string)$doc['file_path'])) ?></td>
+                <td class="text-center"><?= h($doc['type']) ?></td>
+                <td class="text-center"><?= h($docDate ?: '—') ?></td>
+                <td class="text-center">
                   <?php if (!empty($doc['file_path'])): ?>
                     <a href="<?= h($doc['file_path']) ?>" target="_blank" class="btn btn-sm btn-secondary">Ouvrir</a>
                   <?php else: ?>
                     <span class="muted">(manquant)</span>
                   <?php endif; ?>
                 </td>
-                <td style="text-align:center">
-                  <form method="POST" action="supprimer_document.php" class="inline" onsubmit="return confirm('Supprimer ce document ?');">
+                <td class="text-center">
+                  <form method="POST" action="supprimer_document.php" class="inline" onsubmit="event.preventDefault(); var f=this; confirmAction('Supprimer ce document ?', function(){ f.submit(); }, {title:'Suppression', confirmText:'Supprimer', danger:true})">
                     <input type="hidden" name="document_id" value="<?= (int)$doc['id'] ?>">
                     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
                     <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
@@ -758,18 +782,18 @@ function filterClients(){
               }
             ?>
               <tr>
-                <td class="mono" style="text-align:center"><?= h($dateAff) ?></td>
-                <td style="padding:6px 8px"><?= nl2br(h($d['description'])) ?></td>
-                <td class="mono" style="text-align:right;padding-right:8px"><?= number_format((float)$d['montant_ttc'],2,',',' ') ?></td>
-                <td style="text-align:center">
+                <td class="mono text-center"><?= h($dateAff) ?></td>
+                <td><?= nl2br(h($d['description'])) ?></td>
+                <td class="mono text-right"><?= number_format((float)$d['montant_ttc'],2,',',' ') ?></td>
+                <td class="text-center">
                   <?php if ($d['fichier_pdf'] && file_exists(__DIR__ . "/devis_pdf/$fileName")): ?>
                     <a href="<?= h($url) ?>" target="_blank" class="btn btn-sm btn-secondary">Ouvrir</a>
                   <?php else: ?>
                     <span class="muted">(manquant)</span>
                   <?php endif; ?>
                 </td>
-                <td style="text-align:center">
-                  <form method="POST" action="supprimer_devis.php" class="inline" onsubmit="return confirm('Supprimer ce devis ?');">
+                <td class="text-center">
+                  <form method="POST" action="supprimer_devis.php" class="inline" onsubmit="event.preventDefault(); var f=this; confirmAction('Supprimer ce devis ?', function(){ f.submit(); }, {title:'Suppression', confirmText:'Supprimer', danger:true})">
                     <input type="hidden" name="devis_id" value="<?= (int)$d['id'] ?>">
                     <input type="hidden" name="fichier_pdf" value="<?= h((string)$d['fichier_pdf']) ?>">
                     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
@@ -804,18 +828,18 @@ function filterClients(){
               }
             ?>
               <tr>
-                <td class="mono" style="text-align:center"><?= h($dateAffF) ?></td>
-                <td style="padding:6px 8px"><?= nl2br(h($f['description'])) ?></td>
-                <td class="mono" style="text-align:right;padding-right:8px"><?= number_format((float)$f['montant_ttc'],2,',',' ') ?></td>
-                <td style="text-align:center">
+                <td class="mono text-center"><?= h($dateAffF) ?></td>
+                <td><?= nl2br(h($f['description'])) ?></td>
+                <td class="mono text-right"><?= number_format((float)$f['montant_ttc'],2,',',' ') ?></td>
+                <td class="text-center">
                   <?php if ($f['fichier_pdf'] && file_exists(__DIR__ . "/facture_pdf/$fileNameF")): ?>
                     <a href="<?= h($urlF) ?>" target="_blank" class="btn btn-sm btn-secondary">Ouvrir</a>
                   <?php else: ?>
                     <span class="muted">(manquant)</span>
                   <?php endif; ?>
                 </td>
-                <td style="text-align:center">
-                  <form method="POST" action="supprimer_facture.php" class="inline" onsubmit="return confirm('Supprimer cette facture ?');">
+                <td class="text-center">
+                  <form method="POST" action="supprimer_facture.php" class="inline" onsubmit="event.preventDefault(); var f=this; confirmAction('Supprimer cette facture ?', function(){ f.submit(); }, {title:'Suppression', confirmText:'Supprimer', danger:true})">
                     <input type="hidden" name="facture_id" value="<?= (int)$f['id'] ?>">
                     <input type="hidden" name="fichier_pdf" value <?= '"'.h((string)$f['fichier_pdf']).'"' ?>>
                     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
@@ -868,18 +892,18 @@ function filterClients(){
               $montant = is_null($b['montant_ttc']) ? '' : number_format((float)$b['montant_ttc'], 2, ',', ' ');
             ?>
               <tr>
-                <td class="mono" style="text-align:center"><?= h($dateBDC) ?></td>
-                <td style="padding:6px 8px"><?= nl2br(h($b['description'] ?? '')) ?></td>
-                <td class="mono" style="text-align:right;padding-right:8px"><?= $montant ?></td>
-                <td style="text-align:center">
+                <td class="mono text-center"><?= h($dateBDC) ?></td>
+                <td><?= nl2br(h($b['description'] ?? '')) ?></td>
+                <td class="mono text-right"><?= $montant ?></td>
+                <td class="text-center">
                   <?php if ($resolvedUrl): ?>
                     <a href="<?= h($resolvedUrl) ?>" target="_blank" class="btn btn-sm btn-secondary">Ouvrir</a>
                   <?php else: ?>
                     <span class="muted">(manquant)</span>
                   <?php endif; ?>
                 </td>
-                <td style="text-align:center">
-                  <form method="POST" action="supprimer_bdc.php" class="inline" onsubmit="return confirm('Supprimer ce bon de commande ?');">
+                <td class="text-center">
+                  <form method="POST" action="supprimer_bdc.php" class="inline" onsubmit="event.preventDefault(); var f=this; confirmAction('Supprimer ce bon de commande ?', function(){ f.submit(); }, {title:'Suppression', confirmText:'Supprimer', danger:true})">
                     <input type="hidden" name="bdc_id" value="<?= (int)($b['id'] ?? 0) ?>">
                     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
                     <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
@@ -892,13 +916,13 @@ function filterClients(){
         </div>
 
         <?php if ($debug_bdc && $bdc_debug_log): ?>
-          <pre class="mono" style="background:#fafafa;border:1px solid #ddd;padding:8px;border-radius:8px"><?= h(implode("\n", $bdc_debug_log)) ?></pre>
+          <pre class="mono card"><?= h(implode("\n", $bdc_debug_log)) ?></pre>
         <?php endif; ?>
 
       <?php else: ?>
         <p class="small-muted">Aucun bon de commande pour ce client.</p>
         <?php if ($debug_bdc && $bdc_debug_log): ?>
-          <pre class="mono" style="background:#fafafa;border:1px solid #ddd;padding:8px;border-radius:8px"><?= h(implode("\n", $bdc_debug_log)) ?></pre>
+          <pre class="mono card"><?= h(implode("\n", $bdc_debug_log)) ?></pre>
         <?php endif; ?>
       <?php endif; ?>
     </div>
@@ -906,8 +930,6 @@ function filterClients(){
   <?php endif; ?>
 
 </div>
-
-<div id="toast" class="toast">Copié ✅</div>
 
 <script>
 /* Tabs (hash-aware) */
@@ -942,16 +964,19 @@ function filterClients(){
   init();
 })();
 
-/* Copier + toast */
-(function(){
-  const toast = document.getElementById('toast');
-  function showToast(msg){ toast.textContent = msg || 'Copié ✅'; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1400); }
-  document.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('.copy'); if(!btn) return;
-    const val = btn.getAttribute('data-copy') || '';
-    try{ await navigator.clipboard.writeText(val); showToast(); }catch{ alert('Impossible de copier'); }
-  });
-})();
+/* Copier (uses shared toast from inc/toast.js) */
+document.addEventListener('click', async function(e){
+  var btn = e.target.closest('.copy'); if(!btn) return;
+  var val = btn.getAttribute('data-copy') || '';
+  try{
+    await navigator.clipboard.writeText(val);
+    showToast('Copie', 'success');
+    var orig = btn.innerHTML;
+    btn.textContent = 'Copie !';
+    btn.classList.add('copy-success');
+    setTimeout(function(){ btn.innerHTML = orig; btn.classList.remove('copy-success'); }, 1500);
+  }catch(err){ showToast('Impossible de copier', 'error'); }
+});
 
 /* Édition Notes (AJAX) */
 (function(){
@@ -986,7 +1011,7 @@ function filterClients(){
       if(!res.ok){ const t=await res.text(); alert('Échec : '+t); return; }
       view.innerHTML = details.trim() ? details.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') : '<span class="small-muted">Aucune note pour l'instant.</span>';
       toggle(false);
-      const toast = document.getElementById('toast'); toast.textContent='Sauvegardé ✅'; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1500);
+      showToast('Sauvegarde', 'success');
     }catch(e){ alert('Erreur réseau'); console.error(e); }
     finally{ save.disabled=false; }
   });
@@ -1009,7 +1034,7 @@ function filterClients(){
     const placeholder = isPhone ? '06 12 34 56 78' : 'nom@domaine.tld';
     const attrs = isPhone ? 'maxlength="50" inputmode="tel" pattern="[0-9+\\s.\\-()]{6,50}"' : 'maxlength="190"';
     return `
-      <div class="row" style="align-items:end;margin-bottom:6px;border:1px dashed #d7d7d7;padding:8px;border-radius:8px;background:#fafafa">
+      <div class="multi-entry-row">
         <div>
           <label>${isPhone?'Numéro':'E-mail'}<br>
             <input type="${type}" name="${nameV}" value="${esc(value)}" ${attrs} placeholder="${placeholder}" required>
@@ -1020,9 +1045,9 @@ function filterClients(){
             <input type="text" name="${nameL}" value="${esc(label)}" maxlength="50" placeholder="Pro / Perso / Autre">
           </label>
         </div>
-        <div style="display:flex;gap:6px">
-          <button type="button" class="notes-btn secondary js-move-top" title="Mettre en principal">⬆ Principal</button>
-          <button type="button" class="delete-btn js-remove"    title="Supprimer">🗑</button>
+        <div class="actions">
+          <button type="button" class="btn btn-secondary btn-sm js-move-top" title="Mettre en principal">Principal</button>
+          <button type="button" class="btn btn-danger btn-sm js-remove" title="Supprimer">Suppr.</button>
         </div>
       </div>`;
   }
@@ -1032,7 +1057,7 @@ function filterClients(){
 
   function hook(container){
     container.addEventListener('click', (e)=>{
-      const row = e.target.closest('.row'); if(!row) return;
+      const row = e.target.closest('.multi-entry-row'); if(!row) return;
       if(e.target.closest('.js-remove')){ row.parentNode.removeChild(row); }
       if(e.target.closest('.js-move-top')){ container.insertBefore(row, container.firstElementChild); }
     });
@@ -1120,5 +1145,7 @@ function filterClients(){
   if (location.hash.includes('edit=1')) openEdit();
 })();
 </script>
+<?php require __DIR__ . '/inc/toast.php'; ?>
+<?php require __DIR__ . '/inc/modal.php'; ?>
 </body>
 </html>

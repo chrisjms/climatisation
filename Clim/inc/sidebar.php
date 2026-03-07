@@ -1,6 +1,6 @@
 <?php
 /* inc/sidebar.php
-   — Professional sidebar navigation with SVG icons
+   — Dark professional sidebar with user section and grouped navigation
    — Auto-highlights the active link based on the current page
 */
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
@@ -26,31 +26,79 @@ $ICONS = [
     'chart'    => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>',
     'shield'   => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>',
     'logout'   => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2 2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>',
+    'sun'      => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" x2="12" y1="1" y2="3"/><line x1="12" x2="12" y1="21" y2="23"/><line x1="4.22" x2="5.64" y1="4.22" y2="5.64"/><line x1="18.36" x2="19.78" y1="18.36" y2="19.78"/><line x1="1" x2="3" y1="12" y2="12"/><line x1="21" x2="23" y1="12" y2="12"/><line x1="4.22" x2="5.64" y1="19.78" y2="18.36"/><line x1="18.36" x2="19.78" y1="5.64" y2="4.22"/></svg>',
+    'moon'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
 ];
 
-$NAV = [
-    ['href'=>'index.php',          'icon'=>'home',     'label'=>'Accueil',                'match'=>['index.php']],
-    ['href'=>'clientele.php',      'icon'=>'users',    'label'=>'Clientele',              'match'=>['clientele.php','ajout_client.php','update_client.php']],
-    ['href'=>'devis.php',          'icon'=>'file',     'label'=>'Devis / Factures',       'match'=>['devis.php','traitement_devis.php','generer_facture.php','generer_bdc.php','factures.php']],
-    ['href'=>'brochures.php',      'icon'=>'folder',   'label'=>'Brochures',              'match'=>['brochures.php']],
-    ['href'=>'ajout_pac.php',      'icon'=>'wrench',   'label'=>'Materiels',              'match'=>['ajout_pac.php']],
-    ['href'=>'manage_bank.php',    'icon'=>'landmark', 'label'=>'Banques',                'match'=>['manage_bank.php']],
-    ['href'=>'analyses.php',       'icon'=>'chart',    'label'=>'Analyses',               'match'=>['analyses.php']],
-    ['href'=>'gestion_comptes.php','icon'=>'shield',   'label'=>'Comptes',                'match'=>['gestion_comptes.php']],
+$NAV_MAIN = [
+    ['href'=>'index.php',      'icon'=>'home',   'label'=>'Accueil',          'match'=>['index.php']],
+    ['href'=>'clientele.php',  'icon'=>'users',  'label'=>'Clientele',        'match'=>['clientele.php','ajout_client.php','update_client.php']],
+    ['href'=>'devis.php',      'icon'=>'file',   'label'=>'Devis / Factures', 'match'=>['devis.php','traitement_devis.php','generer_facture.php','generer_bdc.php','factures.php']],
+    ['href'=>'brochures.php',  'icon'=>'folder', 'label'=>'Brochures',        'match'=>['brochures.php']],
+    ['href'=>'ajout_pac.php',  'icon'=>'wrench', 'label'=>'Materiels',        'match'=>['ajout_pac.php']],
 ];
+
+$NAV_ADMIN = [
+    ['href'=>'manage_bank.php',    'icon'=>'landmark', 'label'=>'Banques',  'match'=>['manage_bank.php']],
+    ['href'=>'analyses.php',       'icon'=>'chart',    'label'=>'Analyses', 'match'=>['analyses.php']],
+    ['href'=>'gestion_comptes.php','icon'=>'shield',   'label'=>'Comptes',  'match'=>['gestion_comptes.php']],
+];
+
+/* User initials for avatar */
+$initials = '';
+if ($username !== '') {
+    $parts = explode(' ', $username);
+    $initials = mb_strtoupper(mb_substr($parts[0], 0, 1));
+    if (isset($parts[1])) {
+        $initials .= mb_strtoupper(mb_substr($parts[1], 0, 1));
+    }
+    if ($initials === '') {
+        $initials = mb_strtoupper(mb_substr($username, 0, 2));
+    }
+}
 ?>
+<script>if(localStorage.getItem('theme-dark')==='1')document.documentElement.classList.add('theme-dark');</script>
 <div class="sidebar">
   <div class="logo">
     <?php if (file_exists(__DIR__ . '/../assets/logo.jpeg')): ?>
-      <img src="assets/logo.jpeg" alt="Logo" width="32" height="32">
+      <img src="assets/logo.jpeg" alt="Logo" width="34" height="34">
     <?php endif; ?>
     <span>Climatisation</span>
   </div>
 
-  <nav>
-    <?php foreach ($NAV as $item): ?>
+  <button type="button" class="theme-toggle-mobile" id="theme-toggle-mobile"
+          title="Basculer le theme" aria-label="Basculer le theme clair/sombre">
+    <span class="nav-icon theme-icon-sun"><?= $ICONS['sun'] ?></span>
+    <span class="nav-icon theme-icon-moon"><?= $ICONS['moon'] ?></span>
+  </button>
+
+  <?php if ($username !== ''): ?>
+  <div class="sidebar-user">
+    <div class="user-avatar"><?= htmlspecialchars($initials) ?></div>
+    <div>
+      <div class="user-name"><?= htmlspecialchars($username) ?></div>
+      <div class="user-role">Utilisateur</div>
+    </div>
+  </div>
+  <?php endif; ?>
+
+  <nav role="navigation" aria-label="Navigation principale">
+    <?php foreach ($NAV_MAIN as $item):
+      $isActive = nav_active($item['match'], $CURRENT);
+    ?>
       <a href="<?= htmlspecialchars($item['href']) ?>"
-         class="<?= nav_active($item['match'], $CURRENT) ?>">
+         class="<?= $isActive ?>"<?= $isActive ? ' aria-current="page"' : '' ?>>
+        <span class="nav-icon"><?= $ICONS[$item['icon']] ?? '' ?></span>
+        <span><?= htmlspecialchars($item['label']) ?></span>
+      </a>
+    <?php endforeach; ?>
+
+    <div class="nav-sep"></div>
+    <?php foreach ($NAV_ADMIN as $item):
+      $isActive = nav_active($item['match'], $CURRENT);
+    ?>
+      <a href="<?= htmlspecialchars($item['href']) ?>"
+         class="<?= $isActive ?>"<?= $isActive ? ' aria-current="page"' : '' ?>>
         <span class="nav-icon"><?= $ICONS[$item['icon']] ?? '' ?></span>
         <span><?= htmlspecialchars($item['label']) ?></span>
       </a>
@@ -58,9 +106,42 @@ $NAV = [
   </nav>
 
   <div class="sidebar-footer">
-    <a href="logout.php">
+    <button type="button" id="theme-toggle" class="theme-toggle" title="Basculer le theme" aria-label="Basculer le theme clair/sombre">
+      <span class="nav-icon theme-icon-sun"><?= $ICONS['sun'] ?></span>
+      <span class="nav-icon theme-icon-moon"><?= $ICONS['moon'] ?></span>
+      <span class="theme-toggle-label">Mode sombre</span>
+    </button>
+    <a href="logout.php" aria-label="Se deconnecter">
       <span class="nav-icon"><?= $ICONS['logout'] ?></span>
-      <span>Deconnexion<?= $username !== '' ? ' (' . htmlspecialchars($username) . ')' : '' ?></span>
+      <span>Deconnexion</span>
     </a>
   </div>
 </div>
+<script>
+(function(){
+  var html = document.documentElement;
+  var btn = document.getElementById('theme-toggle');
+  var btnMobile = document.getElementById('theme-toggle-mobile');
+  if (!btn) return;
+  function update() {
+    var dark = html.classList.contains('theme-dark');
+    [btn, btnMobile].forEach(function(b){
+      if (!b) return;
+      var sun = b.querySelector('.theme-icon-sun');
+      var moon = b.querySelector('.theme-icon-moon');
+      if (sun) sun.style.display = dark ? 'flex' : 'none';
+      if (moon) moon.style.display = dark ? 'none' : 'flex';
+    });
+    var lbl = btn.querySelector('.theme-toggle-label');
+    if (lbl) lbl.textContent = dark ? 'Mode clair' : 'Mode sombre';
+  }
+  function toggle() {
+    html.classList.toggle('theme-dark');
+    localStorage.setItem('theme-dark', html.classList.contains('theme-dark') ? '1' : '0');
+    update();
+  }
+  btn.addEventListener('click', toggle);
+  if (btnMobile) btnMobile.addEventListener('click', toggle);
+  update();
+})();
+</script>
