@@ -263,7 +263,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Lignes du devis (avec pièces si colonnes présentes)
     $hasPieceKey = has_column($pdo, 'devis_lignes', 'piece_key');
     $hasPieceNom = has_column($pdo, 'devis_lignes', 'piece_nom');
+    $hasOffert   = has_column($pdo, 'devis_lignes', 'offert');
     $cols = "devis_id, pac_id, libelle, quantite, prix_unitaire, tva_taux, total_ht, total_ttc"
+          . ($hasOffert   ? ", offert"    : ", 0 AS offert")
           . ($hasPieceKey ? ", piece_key" : "")
           . ($hasPieceNom ? ", piece_nom" : "");
     $stmt = $pdo->prepare("SELECT $cols FROM devis_lignes WHERE devis_id = ?");
@@ -535,7 +537,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return $res;
         }
 
-        function RowDescription($name, $desc, $qty, $pu, $tva, $ttc) {
+        function RowDescription($name, $desc, $qty, $pu, $tva, $ttc, $offert = false) {
             $x0 = $this->GetX();
             $y0 = $this->GetY();
 
@@ -580,9 +582,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $this->SetFont('DejaVu','',8);
             $this->SetXY($x0 + $wDesc, $y0);
             $this->Cell($wQty, $hRow, (string)$qty, 0, 0, 'C');
-            $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
-            $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
-            $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
+            if ($offert) {
+                // Article offert : mention à la place des montants (la ligne vaut 0 €).
+                $this->SetFont('DejaVu','B',8);
+                $this->Cell($wPU,  $hRow, 'Offert', 0, 0, 'R');
+                $this->SetFont('DejaVu','',8);
+                $this->Cell($wTVA, $hRow, '—', 0, 0, 'C');
+                $this->SetFont('DejaVu','B',8);
+                $this->Cell($wTTC, $hRow, 'Offert', 0, 1, 'R');
+                $this->SetFont('DejaVu','',8);
+            } else {
+                $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
+                $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
+                $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
+            }
 
             $this->SetXY($x0, $y0 + $hRow);
         }
@@ -692,7 +705,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pu  = (float)$m['prix_unitaire'];
             $tva = (float)$m['tva_taux']; // 10 ou 20
             $ttc = (float)$m['total_ttc'];
-            $pdf->RowDescription($lib, $desc, $qty, $pu, $tva, $ttc);
+            $pdf->RowDescription($lib, $desc, $qty, $pu, $tva, $ttc, !empty($m['offert']));
         }
         $pdf->Ln(4);
     }

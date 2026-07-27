@@ -1390,9 +1390,21 @@ h4.cat-title {
 .piece-title-wrap input[type="text"] { max-width: 360px; width: 100%; }
 .piece-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.pac-heads { display: grid; grid-template-columns: 1.2fr 1fr 110px 140px 100px 44px; gap: 10px; margin-top: 10px; color: var(--muted); font-size: var(--fs-12); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.pac-group { display: grid; grid-template-columns: 1.2fr 1fr 110px 140px 100px 44px; gap: 10px; align-items: center; margin-top: 10px; }
+.pac-heads { display: grid; grid-template-columns: 1.2fr 1fr 100px 130px 90px 78px 44px; gap: 10px; margin-top: 10px; color: var(--muted); font-size: var(--fs-12); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.pac-group { display: grid; grid-template-columns: 1.2fr 1fr 100px 130px 90px 78px 44px; gap: 10px; align-items: center; margin-top: 10px; }
 .pac-qty, .pac-price, .pac-tva { width: 100%; }
+
+/* ─────────────── Article offert ─────────────── */
+.offert-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; user-select: none;
+  font-size: var(--fs-13); font-weight: 600; color: var(--ink-secondary);
+  white-space: nowrap;
+}
+.offert-toggle input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--success); margin: 0; }
+.pac-group.is-offert .pac-price { background: var(--bg-2); color: var(--muted); text-decoration: line-through; cursor: not-allowed; }
+.pac-group.is-offert .pac-tva { opacity: .55; }
+.pac-group.is-offert .offert-toggle { color: var(--success); }
 .remove-btn { background: var(--danger); color: #fff; border: none; padding: 8px 12px; cursor: pointer; border-radius: var(--r-md); font-weight: 600; transition: all var(--transition); }
 .remove-btn:hover { background: #b91c1c; }
 .add-pac-btn { margin-top: 10px; background: var(--accent); color: #fff; border: none; padding: 10px 18px; cursor: pointer; border-radius: var(--r-md); font-weight: 600; }

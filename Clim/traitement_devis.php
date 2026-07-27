@@ -52,6 +52,7 @@ $libelles        = $_POST['libelles']        ?? [];
 $quantites       = $_POST['quantites']       ?? [];
 $prix            = $_POST['prix']            ?? [];
 $tva_taux_arr    = $_POST['tva_taux']        ?? []; // (0|10|20)
+$offerts         = $_POST['offerts']         ?? []; // '1' => article offert (toujours posté, aligné sur les autres tableaux)
 $description     = trim($_POST['description'] ?? '');
 $date_echeance   = $_POST['date_echeance']   ?? null;
 
@@ -121,6 +122,7 @@ $rowCount = max(
     count($libelles),
     count($pac_ids),
     count($tva_taux_arr),
+    count($offerts),
     count($piece_keys)
 );
 
@@ -139,6 +141,7 @@ for ($i = 0; $i < $rowCount; $i++) {
     $qte  = isset($quantites[$i]) ? (int)$quantites[$i]   : 1;
     $lbl  = isset($libelles[$i])  ? trim((string)$libelles[$i]) : '';
     $pac  = isset($pac_ids[$i])   ? (int)$pac_ids[$i] : 0;
+    $offert = isset($offerts[$i]) && (string)$offerts[$i] === '1';
 
     // TVA acceptée : 0 / 10 / 20 ; toute autre valeur => 20
     $tvaRaw = $tva_taux_arr[$i] ?? 20;
@@ -152,7 +155,15 @@ for ($i = 0; $i < $rowCount; $i++) {
     if ($pKey === '') $pKey = $DEFAULT_PIECE_KEY;
     $pName = $pieceNameByKey[$pKey] ?? $DEFAULT_PIECE_NAME;
 
-    if ($pu <= 0) continue;           // ignore les lignes vides
+    if ($offert) {
+        // Article offert : PU et TVA forcés à 0 pour ne rien peser dans les totaux,
+        // mais la ligne reste imprimée sur le devis avec la mention « Offert ».
+        if ($pac <= 0 && $lbl === '') continue;   // ligne réellement vide
+        $pu   = 0.0;
+        $tvaI = 0.0;
+    } elseif ($pu <= 0) {
+        continue;                     // ignore les lignes vides
+    }
     if ($qte <= 0) $qte = 1;
 
     // Récupère nom & description du catalogue si pac_id défini
@@ -196,6 +207,7 @@ for ($i = 0; $i < $rowCount; $i++) {
         'tva_taux'   => $tvaI,
         'total_ht'   => $ligne_ht,
         'total_ttc'  => $ligne_ttc,
+        'offert'     => $offert ? 1 : 0,
         'piece_key'  => $pKey,
         'piece_nom'  => $pName
     ];
@@ -416,7 +428,7 @@ class PDF_Devis extends tFPDF {
         return $res;
     }
 
-    function RowDescription($name, $desc, $qty, $pu, $tva, $ttc) {
+    function RowDescription($name, $desc, $qty, $pu, $tva, $ttc, $offert = false) {
         $x0 = $this->GetX();
         $y0 = $this->GetY();
 
@@ -463,9 +475,20 @@ class PDF_Devis extends tFPDF {
         $this->SetFont('DejaVu','',8);
         $this->SetXY($x0 + $wDesc, $y0);
         $this->Cell($wQty, $hRow, (string)$qty, 0, 0, 'C');
-        $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
-        $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
-        $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
+        if ($offert) {
+            // Article offert : on affiche la mention au lieu des montants (la ligne vaut 0 €).
+            $this->SetFont('DejaVu','B',8);
+            $this->Cell($wPU,  $hRow, 'Offert', 0, 0, 'R');
+            $this->SetFont('DejaVu','',8);
+            $this->Cell($wTVA, $hRow, '—', 0, 0, 'C');
+            $this->SetFont('DejaVu','B',8);
+            $this->Cell($wTTC, $hRow, 'Offert', 0, 1, 'R');
+            $this->SetFont('DejaVu','',8);
+        } else {
+            $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
+            $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
+            $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
+        }
 
         $this->SetXY($x0, $y0 + $hRow);
     }
@@ -562,7 +585,8 @@ foreach ($orderedKeys as $k) {
             $m['quantite'],
             $m['prix_ht'],
             $m['tva_taux'],
-            $m['total_ttc']
+            $m['total_ttc'],
+            !empty($m['offert'])
         );
     }
 
@@ -597,7 +621,8 @@ $pdf->Output('F', $filepath);
 /* === Enregistrement en BDD (transaction) === */
 
 // Ajoute automatiquement les colonnes pièce si absentes
-$hasPieceCols = false;
+$hasPieceCols  = false;
+$hasOffertCol  = false;
 try {
     $col1 = $pdo->query("SHOW COLUMNS FROM devis_lignes LIKE 'piece_key'")->rowCount() > 0;
     $col2 = $pdo->query("SHOW COLUMNS FROM devis_lignes LIKE 'piece_nom'")->rowCount() > 0;
@@ -610,6 +635,17 @@ try {
 } catch (Throwable $e) {
     // On n'arrête pas la génération si la migration échoue ; on enregistrera sans les colonnes pièce.
     error_log('[MIGRATION devis_lignes] '.$e->getMessage());
+}
+
+// Colonne "offert" (articles offerts) — migration automatique, même principe
+try {
+    $hasOffertCol = $pdo->query("SHOW COLUMNS FROM devis_lignes LIKE 'offert'")->rowCount() > 0;
+    if (!$hasOffertCol && $pdo->query("SHOW TABLES LIKE 'devis_lignes'")->rowCount() > 0) {
+        $pdo->exec("ALTER TABLE devis_lignes ADD COLUMN offert TINYINT(1) NOT NULL DEFAULT 0 AFTER total_ttc");
+        $hasOffertCol = true;
+    }
+} catch (Throwable $e) {
+    error_log('[MIGRATION devis_lignes.offert] '.$e->getMessage());
 }
 
 try {
@@ -637,45 +673,30 @@ try {
     $devis_id = (int)$pdo->lastInsertId();
 
     if ($pdo->query("SHOW TABLES LIKE 'devis_lignes'")->rowCount() > 0) {
-        if ($hasPieceCols) {
-            $stmtLigne = $pdo->prepare(
-                'INSERT INTO devis_lignes
-                   (devis_id, pac_id, libelle, quantite, prix_unitaire, tva_taux, total_ht, total_ttc, piece_key, piece_nom)
-                 VALUES (?,?,?,?,?,?,?,?,?,?)'
-            );
-            foreach ($materiels as $m) {
-                $stmtLigne->execute([
-                    $devis_id,
-                    $m['pac_id'] ?: null,
-                    $m['libelle'],
-                    $m['quantite'],
-                    $m['prix_ht'],
-                    $m['tva_taux'],
-                    $m['total_ht'],
-                    $m['total_ttc'],
-                    $m['piece_key'],
-                    $m['piece_nom'],
-                ]);
-            }
-        } else {
-            // fallback sans colonnes pièce
-            $stmtLigne = $pdo->prepare(
-                'INSERT INTO devis_lignes
-                   (devis_id, pac_id, libelle, quantite, prix_unitaire, tva_taux, total_ht, total_ttc)
-                 VALUES (?,?,?,?,?,?,?,?)'
-            );
-            foreach ($materiels as $m) {
-                $stmtLigne->execute([
-                    $devis_id,
-                    $m['pac_id'] ?: null,
-                    $m['libelle'],
-                    $m['quantite'],
-                    $m['prix_ht'],
-                    $m['tva_taux'],
-                    $m['total_ht'],
-                    $m['total_ttc'],
-                ]);
-            }
+        // Colonnes construites dynamiquement : les colonnes pièce et "offert" ne sont
+        // écrites que si la migration correspondante a réussi.
+        $cols = ['devis_id','pac_id','libelle','quantite','prix_unitaire','tva_taux','total_ht','total_ttc'];
+        if ($hasOffertCol) $cols[] = 'offert';
+        if ($hasPieceCols) { $cols[] = 'piece_key'; $cols[] = 'piece_nom'; }
+
+        $stmtLigne = $pdo->prepare(
+            'INSERT INTO devis_lignes ('.implode(', ', $cols).')
+             VALUES ('.implode(',', array_fill(0, count($cols), '?')).')'
+        );
+        foreach ($materiels as $m) {
+            $vals = [
+                $devis_id,
+                $m['pac_id'] ?: null,
+                $m['libelle'],
+                $m['quantite'],
+                $m['prix_ht'],
+                $m['tva_taux'],
+                $m['total_ht'],
+                $m['total_ttc'],
+            ];
+            if ($hasOffertCol) $vals[] = (int)$m['offert'];
+            if ($hasPieceCols) { $vals[] = $m['piece_key']; $vals[] = $m['piece_nom']; }
+            $stmtLigne->execute($vals);
         }
     }
 

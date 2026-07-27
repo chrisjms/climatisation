@@ -287,8 +287,11 @@ function pagination_html(int $page, int $totalPages, string $pageParam, string $
 
 /* ──────────── Helpers pour charger les lignes/PIÈCES ──────────── */
 function fetchLinesFromDevisLignes(PDO $pdo, int $devisId): array {
+    // La colonne `offert` est ajoutée par migration auto (traitement_devis.php) : on tolère son absence.
+    $hasOffert = in_array('offert', show_cols($pdo, 'devis_lignes'), true);
     $sql = "
         SELECT pac_id, libelle, quantite, prix_unitaire AS prix_ht, tva_taux,
+               " . ($hasOffert ? 'offert' : '0 AS offert') . ",
                piece_key, piece_nom
         FROM devis_lignes
         WHERE devis_id = :id
@@ -304,6 +307,7 @@ function fetchLinesFromDevisLignes(PDO $pdo, int $devisId): array {
             'quantite'  => (int)($r['quantite'] ?? 1),
             'prix_ht'   => (float)($r['prix_ht'] ?? 0),
             'tva'       => isset($r['tva_taux']) ? (float)$r['tva_taux'] : 20.0,
+            'offert'    => !empty($r['offert']),
             'piece_key' => ($r['piece_key'] ?? null),
             'piece_nom' => ($r['piece_nom'] ?? null),
         ];
@@ -330,6 +334,7 @@ function fetchLinesFromDevisItems(PDO $pdo, int $devisId): array {
             'quantite' => (int)($r['quantite'] ?? 1),
             'prix_ht'  => (float)($r['prix_ht'] ?? 0),
             'tva'      => 20.0,
+            'offert'   => false,
         ];
     }, $rows);
 }
@@ -362,6 +367,7 @@ function fetchDevisPieces(PDO $pdo, int $devisId): array {
                     'quantite' => $r['quantite'],
                     'prix_ht'  => $r['prix_ht'],
                     'tva'      => $r['tva'],
+                    'offert'   => !empty($r['offert']),
                 ];
             }
             $idx = 1;
@@ -532,7 +538,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
             const heads = document.createElement('div');
             heads.className = 'pac-heads';
-            heads.innerHTML = '<span>Matériel (recherche / liste)</span><span>Nom sur devis</span><span>Quantité</span><span>Prix (€ HT)</span><span>TVA</span><span></span>';
+            heads.innerHTML = '<span>Matériel (recherche / liste)</span><span>Nom sur devis</span><span>Quantité</span><span>Prix (€ HT)</span><span>TVA</span><span>Offert</span><span></span>';
 
             const linesContainer = document.createElement('div');
             linesContainer.className = 'lines-container';
@@ -552,7 +558,8 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                         (typeof it.quantite !== 'undefined' ? Number(it.quantite) : null),
                         it.libelle || '',
                         (typeof it.prix_ht !== 'undefined' ? Number(it.prix_ht) : ''),
-                        (typeof it.tva !== 'undefined' ? Number(it.tva) : 20)
+                        (typeof it.tva !== 'undefined' ? Number(it.tva) : 20),
+                        !!it.offert
                     );
                 });
             } else {
@@ -563,7 +570,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             return card;
         }
 
-        function addPacRow(containerEl, pieceKey, defaultId = '', defaultQty = null, defaultLabel = '', defaultPrice = '', defaultTva = 20) {
+        function addPacRow(containerEl, pieceKey, defaultId = '', defaultQty = null, defaultLabel = '', defaultPrice = '', defaultTva = 20, defaultOffert = false) {
             if (!containerEl) return;
             const row = document.createElement('div');
             row.className = 'pac-group';
@@ -661,6 +668,28 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             tva.value = tvaVal;
             tva.onchange = updateTotal;
 
+            // ── Case "Offert" : la ligne reste imprimée sur le devis mais ne pèse rien dans les totaux.
+            // Le drapeau est un input hidden TOUJOURS posté ('0' ou '1') : une checkbox non cochée
+            // n'est pas envoyée par le navigateur, ce qui décalerait offerts[] par rapport à prix[].
+            const offertWrap = document.createElement('label');
+            offertWrap.className = 'offert-toggle';
+            offertWrap.title = 'Offrir cet article : il apparaît sur le devis avec la mention « Offert »';
+
+            const offertFlag = document.createElement('input');
+            offertFlag.type  = 'hidden';
+            offertFlag.name  = 'offerts[]';
+            offertFlag.value = '0';
+
+            const offertBox = document.createElement('input');
+            offertBox.type = 'checkbox';
+            offertBox.className = 'pac-offert';
+            offertBox.onchange = () => { applyOffert(row, offertBox.checked); updateTotal(); };
+
+            const offertTxt = document.createElement('span');
+            offertTxt.textContent = 'Offert';
+
+            offertWrap.append(offertBox, offertTxt, offertFlag);
+
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'remove-btn';
@@ -668,7 +697,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             btn.title   = 'Retirer cette ligne';
             btn.onclick = () => { row.remove(); updateTotal(); };
 
-            row.append(wrap, libelle, qty, prix, tva, btn);
+            row.append(wrap, libelle, qty, prix, tva, offertWrap, btn);
             containerEl.appendChild(row);
 
             function highlight(text, q){
@@ -749,6 +778,44 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
               }
             }
             updatePrixEtQty(row, defaultPrice);
+            if (defaultOffert) applyOffert(row, true);
+        }
+
+        // Bascule l'état "offert" d'une ligne : prix neutralisé et verrouillé.
+        // On utilise readOnly (et non disabled) pour que le champ reste posté et que
+        // les tableaux prix[] / quantites[] / offerts[] gardent le même nombre d'entrées.
+        function applyOffert(row, on) {
+            const flag = row.querySelector('input[name="offerts[]"]');
+            const box  = row.querySelector('.pac-offert');
+            const prix = row.querySelector('.pac-price');
+
+            if (flag) flag.value = on ? '1' : '0';
+            if (box)  box.checked = !!on;
+            row.classList.toggle('is-offert', !!on);
+
+            if (!prix) return;
+            if (on) {
+                // Mémorise le prix courant pour pouvoir le restaurer si on décoche
+                if (prix.value !== '' && Number(prix.value) !== 0) prix.dataset.prevPrice = prix.value;
+                prix.value = '0.00';
+                prix.readOnly = true;
+            } else {
+                prix.readOnly = false;
+                if (prix.dataset.prevPrice) {
+                    prix.value = prix.dataset.prevPrice;
+                    delete prix.dataset.prevPrice;
+                } else if (Number(prix.value) === 0) {
+                    // Aucun prix mémorisé (ligne reprise d'un devis existant) : on retombe sur le prix catalogue
+                    const sel = row.querySelector('select[name="pac_ids[]"]');
+                    const opt = sel && sel.selectedOptions[0];
+                    prix.value = (opt && opt.dataset.prix) ? Number(opt.dataset.prix).toFixed(2) : '';
+                }
+            }
+        }
+
+        function isOffertRow(row) {
+            const box = row.querySelector('.pac-offert');
+            return !!(box && box.checked);
         }
 
         function clampQty(input) {
@@ -783,6 +850,8 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                 }
                 if (!qtyEl.value) qtyEl.value = '';
             }
+            // Ligne offerte : le prix catalogue qu'on vient d'injecter est remis à 0 (et mémorisé).
+            if (isOffertRow(row)) applyOffert(row, true);
             updateTotal();
         }
 
@@ -813,7 +882,8 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                     if (isNaN(qty) || qty < 1) qty = 1;
 
                     const tvaV = parseFloat(row.querySelector('.pac-tva')?.value || '20');
-                    const lineHT = round2((isNaN(prix) ? 0 : prix) * qty);
+                    // Article offert : ne compte pour rien dans les totaux
+                    const lineHT = isOffertRow(row) ? 0 : round2((isNaN(prix) ? 0 : prix) * qty);
 
                     const rKey = String(isNaN(tvaV) ? 20 : tvaV);
                     pieceHTByRate[rKey] = round2((pieceHTByRate[rKey] || 0) + lineHT);
@@ -968,6 +1038,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                         var sel = row.querySelector('select[name="pac_ids[]"]');
                         if (sel && sel.value) {
                             validRows++;
+                            if (isOffertRow(row)) return; // pas de prix à saisir pour un article offert
                             var pr = row.querySelector('.pac-price');
                             if (!pr || pr.value === '' || isNaN(Number(pr.value))) badPrice = true;
                         }
@@ -1028,7 +1099,8 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                                 libelle: (row.querySelector('input[name="libelles[]"]') || {}).value || '',
                                 quantite: parseInt((row.querySelector('.pac-qty') || {}).value) || 1,
                                 prix_ht: parseFloat((row.querySelector('.pac-price') || {}).value) || 0,
-                                tva: parseFloat((row.querySelector('.tva-select') || {}).value) || 20
+                                tva: parseFloat((row.querySelector('.pac-tva') || {}).value) || 20,
+                                offert: isOffertRow(row)
                             });
                         });
                         pieces.push({ nom: nameInput ? nameInput.value : '', items: items });

@@ -75,6 +75,7 @@ function mapRows(array $rows): array {
             'quantite'  => $q,
             'prix_ht'   => $pu,
             'tva'       => $tva,
+            'offert'    => !empty($r['offert']),
             'piece_key' => $pkey,
             'piece_nom' => $pnom,
         ];
@@ -96,6 +97,7 @@ function smartFetchFromTable(PDO $pdo, string $table, int $devisId): array {
 
     $cPKey = in_array('piece_key',$cols,true) ? 'piece_key' : null;
     $cPNom = in_array('piece_nom',$cols,true) ? 'piece_nom' : null;
+    $cOff  = in_array('offert',   $cols,true) ? 'offert'    : null;
 
     if (!$cLib && !$cPU && !$cQte) return [];
 
@@ -105,6 +107,7 @@ function smartFetchFromTable(PDO $pdo, string $table, int $devisId): array {
     if ($cQte)  $sel[] = "`$cQte`   AS quantite";
     if ($cPU)   $sel[] = "`$cPU`    AS prix_ht";
     if ($cTVA)  $sel[] = "`$cTVA`   AS tva";
+    if ($cOff)  $sel[] = "`$cOff`   AS offert";
     if ($cPKey) $sel[] = "`$cPKey`  AS piece_key";
     if ($cPNom) $sel[] = "`$cPNom`  AS piece_nom";
 
@@ -264,6 +267,9 @@ foreach ($lines as &$ln) {
     if ($qty <= 0) $qty = 1;
     $pu  = (float)($ln['prix_ht'] ?? 0);
     $tva = normRate($ln['tva'] ?? 20.0);
+
+    // Article offert : ne pèse rien dans les totaux (le prix stocké est déjà 0, on sécurise).
+    if (!empty($ln['offert'])) { $pu = 0.0; $tva = 0.0; $ln['prix_ht'] = 0.0; }
 
     $lht  = round2($qty * $pu);
     $ltva = round2($lht * ($tva/100.0));
@@ -556,7 +562,7 @@ if ($method === 'POST') {
             return $res;
         }
 
-        function RowDescription($name, $desc, $qty, $pu, $tva, $ttc) {
+        function RowDescription($name, $desc, $qty, $pu, $tva, $ttc, $offert = false) {
             $x0 = $this->GetX(); $y0 = $this->GetY();
             $wDesc = 70; $wQty = 20; $wPU = 30; $wTVA = 20; $wTTC = 30; $pad = 2;
             $wDescIn = $wDesc - 2*$pad;
@@ -588,9 +594,20 @@ if ($method === 'POST') {
             $this->SetFont('DejaVu','',8);
             $this->SetXY($x0 + $wDesc, $y0);
             $this->Cell($wQty, $hRow, (string)$qty, 0, 0, 'C');
-            $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
-            $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
-            $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
+            if ($offert) {
+                // Article offert : mention à la place des montants (la ligne vaut 0 €).
+                $this->SetFont('DejaVu','B',8);
+                $this->Cell($wPU,  $hRow, 'Offert', 0, 0, 'R');
+                $this->SetFont('DejaVu','',8);
+                $this->Cell($wTVA, $hRow, '—', 0, 0, 'C');
+                $this->SetFont('DejaVu','B',8);
+                $this->Cell($wTTC, $hRow, 'Offert', 0, 1, 'R');
+                $this->SetFont('DejaVu','',8);
+            } else {
+                $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
+                $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
+                $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
+            }
 
             $this->SetXY($x0, $y0 + $hRow);
         }
@@ -665,7 +682,8 @@ if ($method === 'POST') {
                 $m['quantite'],
                 $m['prix_ht'],
                 $m['tva'],
-                $m['total_ttc']
+                $m['total_ttc'],
+                !empty($m['offert'])
             );
         }
 
