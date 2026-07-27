@@ -6,29 +6,15 @@
 // --- Auth & PDO
 require 'auth.php';
 require 'config.php';
+require __DIR__ . '/inc/helpers.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
 // ───────────────────────── Helpers BDD robustes ─────────────────────────
-function table_exists(PDO $pdo, string $name): bool {
-    $st = $pdo->prepare("SHOW TABLES LIKE ?");
-    $st->execute([$name]);
-    return (bool)$st->fetchColumn();
-}
-function list_columns(PDO $pdo, string $table): array {
-    try {
-        $st = $pdo->query("SHOW COLUMNS FROM `$table`");
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
-        return array_map(fn($r) => $r['Field'], $rows ?: []);
-    } catch (Throwable $e) {
-        return [];
-    }
-}
 function first_col(array $prefs, array $cols, ?string $fallback = null): ?string {
     foreach ($prefs as $c) if (in_array($c, $cols, true)) return $c;
     return $fallback;
 }
-function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function eur($n){ if ($n===null || $n==='') return '—'; return number_format((float)$n, 2, ',', ' ').' €'; }
 function ymd($d){ if(!$d) return ''; $ts = strtotime($d); return $ts? date('Y-m-d', $ts): (string)$d; }
 function dmy($d){ if(!$d) return ''; $ts = strtotime($d); return $ts? date('d/m/Y', $ts): (string)$d; }

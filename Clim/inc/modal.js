@@ -41,6 +41,7 @@
     overlay.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     onConfirmCb = null;
+    confirmBtn.disabled = false;
     overlay.removeEventListener('keydown', trapFocus);
   }
 
@@ -60,8 +61,10 @@
   // Cancel button
   cancelBtn.addEventListener('click', close);
 
-  // Confirm button
+  // Confirm button — désactivé immédiatement pour bloquer un double-clic au cas où cb() serait synchrone et long
   confirmBtn.addEventListener('click', function() {
+    if (confirmBtn.disabled) return;
+    confirmBtn.disabled = true;
     var cb = onConfirmCb;
     close();
     if (cb) cb();

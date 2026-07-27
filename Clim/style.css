@@ -2032,3 +2032,31 @@ a.pipeline-link:hover { box-shadow: var(--shadow-3); transform: translateY(-2px)
 
 /* Date Range Search */
 .searchbar input[type="date"] { flex: 0 0 auto; width: 155px; }
+
+/* ─────────────── Bouton "Suppr." des lignes répétables (téléphones / e-mails / pièces) ─────────────── */
+.trash {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 40px; padding: 8px 14px;
+  background: var(--danger-subtle); color: var(--danger);
+  border: 1.5px solid var(--danger);
+  border-radius: var(--r-md);
+  font-size: var(--fs-13); font-weight: 600;
+  cursor: pointer; transition: all var(--transition);
+}
+.trash:hover { background: var(--danger); color: #fff; }
+
+/* ─────────────── Ajustements mobile (≤ 640px) ─────────────── */
+@media (max-width: 640px) {
+  /* Colonnes de tableau (devis/factures) : libérer la largeur */
+  .col-price,
+  .col-actions { width: auto; }
+
+  /* Textarea du formulaire d'upload : suivre le container */
+  .upload-box textarea { width: 100%; box-sizing: border-box; }
+
+  /* Champ date dans la barre de recherche : prend toute la place dispo */
+  .searchbar input[type="date"] { flex: 1 1 auto; width: 100%; }
+
+  /* Formulaire libellé/champ : passer en une colonne */
+  .form-row-inline { grid-template-columns: 1fr; }
+}

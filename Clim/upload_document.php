@@ -1,6 +1,7 @@
 <?php
 require 'auth.php';
 require 'config.php';
+require __DIR__ . '/inc/helpers.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
@@ -17,17 +18,6 @@ function redirect_ok(string $msg, $client_id) {
 }
 
 /* ───────── DB helpers ───────── */
-function table_exists(PDO $pdo, string $name): bool {
-    $s = $pdo->prepare("SHOW TABLES LIKE ?");
-    $s->execute([$name]);
-    return (bool)$s->fetchColumn();
-}
-function list_columns(PDO $pdo, string $table): array {
-    $s = $pdo->prepare("SHOW COLUMNS FROM `$table`");
-    $s->execute();
-    $rows = $s->fetchAll(PDO::FETCH_ASSOC);
-    return array_map(fn($r) => $r['Field'], $rows ?: []);
-}
 function get_column_info(PDO $pdo, string $table, string $column): ?array {
     $s = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
     $s->execute([$column]);

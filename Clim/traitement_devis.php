@@ -14,13 +14,17 @@
 
 require 'auth.php';
 require 'config.php';
+require __DIR__ . '/inc/helpers.php';
+
+// Garde-fou anti-doublon sur la numérotation (race condition possible entre deux POST concurrents)
+ensure_unique_index($pdo, 'devis', 'numero');
 
 // Chemin des polices pour tFPDF/FPDF
 define('FPDF_FONTPATH', __DIR__ . '/tfpdf/font/');
 require __DIR__ . '/tfpdf/tfpdf.php'; // tFPDF (TrueType, UTF-8)
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__.'/error_devis.log');
@@ -695,8 +699,13 @@ try {
 
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
+    @unlink($filepath); // PDF orphelin si l'INSERT a échoué
     http_response_code(500);
-    exit('Erreur enregistrement devis : '.$e->getMessage());
+    if (is_duplicate_key_error($e)) {
+        exit('Conflit de numérotation (un autre devis a pris le même numéro). Veuillez réessayer.');
+    }
+    error_log('[traitement_devis] '.$e->getMessage());
+    exit('Erreur enregistrement devis. Réessayez ou consultez les logs.');
 }
 
 /* ──────────────────────────────────────────────────────────────

@@ -204,7 +204,7 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
                                 $lab = $postedLbls[$i] ?? '';
                             ?>
                             <div class="row-grid phone-row">
-                                <input type="text" name="telephone[]" value="<?= e($v) ?>" placeholder="+33 6 12 34 56 78">
+                                <input type="tel" inputmode="tel" name="telephone[]" value="<?= e($v) ?>" placeholder="+33 6 12 34 56 78">
                                 <input type="text" name="tel_label[]" value="<?= e($lab) ?>" placeholder="Libellé (Pro, Perso…)">
                                 <button type="button" class="trash" onclick="removeRow(this)">Suppr.</button>
                             </div>
@@ -230,7 +230,7 @@ $default_date_value = e($_POST['date_ajout'] ?? date('Y-m-d'));
                                 $ml = $postedMailLbl[$i] ?? '';
                             ?>
                             <div class="row-grid email-row">
-                                <input type="email" name="email[]" value="<?= e($m) ?>" placeholder="exemple@mail.com">
+                                <input type="email" inputmode="email" autocapitalize="off" autocorrect="off" name="email[]" value="<?= e($m) ?>" placeholder="exemple@mail.com">
                                 <input type="text" name="email_label[]" value="<?= e($ml) ?>" placeholder="Libellé (Pro, Perso…)">
                                 <button type="button" class="trash" onclick="removeRow(this)">Suppr.</button>
                             </div>
@@ -322,7 +322,7 @@ function addPhone(){
     const el = document.createElement('div');
     el.className = 'row-grid phone-row';
     el.innerHTML = `
-        <input type="text" name="telephone[]" placeholder="+33 6 12 34 56 78">
+        <input type="tel" inputmode="tel" name="telephone[]" placeholder="+33 6 12 34 56 78">
         <input type="text" name="tel_label[]" placeholder="Libellé (Pro, Perso…)">
         <button type="button" class="trash" onclick="removeRow(this)">Suppr.</button>
     `;
@@ -334,7 +334,7 @@ function addEmail(){
     const el = document.createElement('div');
     el.className = 'row-grid email-row';
     el.innerHTML = `
-        <input type="email" name="email[]" placeholder="exemple@mail.com">
+        <input type="email" inputmode="email" autocapitalize="off" autocorrect="off" name="email[]" placeholder="exemple@mail.com">
         <input type="text" name="email_label[]" placeholder="Libellé (Pro, Perso…)">
         <button type="button" class="trash" onclick="removeRow(this)">Suppr.</button>
     `;

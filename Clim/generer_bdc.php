@@ -10,6 +10,7 @@
  ***************************************************************/
 require 'auth.php';
 require 'config.php';
+require __DIR__ . '/inc/helpers.php';
 
 define('FPDF_FONTPATH', __DIR__ . '/tfpdf/font/');
 $tfpdfPath = __DIR__ . '/tfpdf/tfpdf.php';
@@ -355,7 +356,13 @@ if ($method === 'POST') {
             ':at'=>$atype, ':av'=>$aval, ':am'=>$acompte_montant, ':ttc'=>$total_ttc
         ]);
         $bdcId = (int)$pdo->lastInsertId();
-    } catch(Throwable $e){ abortX(500, "Enregistrement BDC impossible."); }
+    } catch(Throwable $e){
+        if (is_duplicate_key_error($e)) {
+            abortX(409, "Conflit de numérotation BDC. Veuillez réessayer.");
+        }
+        error_log('[generer_bdc] '.$e->getMessage());
+        abortX(500, "Enregistrement BDC impossible.");
+    }
 
     /* ───── Vérification polices (comme devis) ───── */
     $fontDir = __DIR__ . '/tfpdf/font';
@@ -751,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <strong><?= number_format($total_ttc,2,',',' ') ?> €</strong>
   </span></p>
 
-  <form method="POST">
+  <form method="POST" data-submit-once>
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
     <input type="hidden" name="id" value="<?= (int)$devisId ?>">
 
@@ -775,5 +782,6 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   </form>
 </div>
+<script src="inc/submit-once.js"></script>
 </body>
 </html>

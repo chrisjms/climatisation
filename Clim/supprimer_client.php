@@ -8,6 +8,7 @@
 
 require 'auth.php';
 require 'config.php';
+require __DIR__ . '/inc/helpers.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
@@ -42,18 +43,6 @@ function file_candidates(string $raw, ?string $defaultDir = null): array {
     if ($b && $defaultDir) $c[] = rtrim($defaultDir, '/\\').'/'.$b;
     return array_values(array_unique($c));
 }
-function table_exists(PDO $pdo, string $name): bool {
-    $stmt = $pdo->prepare("SHOW TABLES LIKE ?");
-    $stmt->execute([$name]);
-    return (bool)$stmt->fetchColumn();
-}
-function list_columns(PDO $pdo, string $table): array {
-    $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table`");
-    $stmt->execute();
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    return array_map(fn($r) => $r['Field'], $rows ?: []);
-}
-
 /**
  * Diagnostique les références FK sur clients.id et compte les lignes bloquantes.
  * Retourne un tableau [ ['table'=>'X','column'=>'client_id','cnt'=>N,'delete_rule'=>'CASCADE|RESTRICT|...'], ... ]

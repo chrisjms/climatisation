@@ -13,9 +13,13 @@
  ***************************************************************/
 require 'auth.php';
 require 'config.php';
+require __DIR__ . '/inc/helpers.php';
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Garde-fou anti-doublon sur la numérotation des factures
+ensure_unique_index($pdo, 'factures', 'numero');
+
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__.'/php-error.log');
@@ -156,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 <?php endif; ?>
             </p>
 
-            <form method="POST">
+            <form method="POST" data-submit-once>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                 <input type="hidden" name="src" value="<?= htmlspecialchars($src) ?>">
                 <input type="hidden" name="id" value="<?= (int)$id ?>">
@@ -188,6 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 Source&nbsp;: <strong><?= $src==='bdc' ? 'Bon de commande' : 'Devis' ?></strong>.
             </p>
         </div>
+        <script src="inc/submit-once.js"></script>
     </body>
     </html>
     <?php
@@ -207,8 +212,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $note_acompte     = trim((string)($_POST['note_acompte'] ?? ''));
 
     if ($id_input <= 0) abort_with(($src==='bdc'?'BDC':'Devis').' invalide.');
-    if (!preg_match('~^\d{4}-\d{2}-\d{2}$~', $date_facture)) abort_with('Date de facture invalide.');
-    if ($date_prestation !== '' && !preg_match('~^\d{4}-\d{2}-\d{2}$~', $date_prestation)) abort_with('Date de prestation invalide.');
+
+    // Validation date : format ET calendrier réel (rejette 2026-13-45)
+    $check_date = function (string $d, string $label) {
+        if (!preg_match('~^(\d{4})-(\d{2})-(\d{2})$~', $d, $m)) {
+            abort_with("$label invalide (format attendu YYYY-MM-DD).");
+        }
+        if (!checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
+            abort_with("$label invalide ($d n'existe pas).");
+        }
+    };
+    $check_date($date_facture, 'Date de facture');
+    if ($date_prestation !== '') $check_date($date_prestation, 'Date de prestation');
 
     // Contexte (devis + éventuellement bdc + client)
     $ctx = load_source($pdo, $src, $id_input);
@@ -287,9 +302,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $total_tva = $total_ttc - $total_ht;
 
-    // Valide acompte
-    if ($acompte < 0) $acompte = 0.0;
-    if ($acompte > $total_ttc) $acompte = $total_ttc;
+    // Valide acompte : on refuse explicitement plutôt que de clamper silencieusement.
+    if ($acompte < 0) {
+        abort_with("L'acompte ne peut pas être négatif.");
+    }
+    if ($acompte > $total_ttc + 0.01) {
+        abort_with(sprintf(
+            "L'acompte (%s €) dépasse le total TTC (%s €).",
+            number_format($acompte, 2, ',', ' '),
+            number_format($total_ttc, 2, ',', ' ')
+        ));
+    }
     $net_a_payer = max(0.0, $total_ttc - $acompte);
 
     /* ───── Polices DejaVu ───── */
@@ -750,7 +773,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             null, ($payment_planned['mode'] ?? null), ($devis['bank_account_id'] ?? null), $filepath
         ];
     }
-    $pdo->prepare($sql)->execute($params);
+    try {
+        $pdo->prepare($sql)->execute($params);
+    } catch (Throwable $e) {
+        @unlink($filepath); // PDF orphelin si l'INSERT a échoué
+        if (is_duplicate_key_error($e)) {
+            abort_with('Conflit de numérotation (une autre facture a pris le même numéro). Veuillez réessayer.');
+        }
+        error_log('[generer_facture] '.$e->getMessage());
+        abort_with('Erreur enregistrement facture. Réessayez ou consultez les logs.');
+    }
 
     // Stream navigateur
     if (ob_get_length()) ob_end_clean();

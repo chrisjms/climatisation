@@ -601,7 +601,9 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
             const select = document.createElement('select');
             select.name = 'pac_ids[]';
-            select.required = true;
+            // Pas de `required` HTML5 : ce select est masqué (display:none) donc non-focusable.
+            // Un required sur un champ caché fait que le navigateur bloque la soumission EN SILENCE.
+            // La présence d'un matériel est validée en JS au submit (voir handler form-devis).
             select.style.display = 'none';
             select.onchange = () => updatePrixEtQty(row);
 
@@ -631,7 +633,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             qty.min = '1';
             qty.step = '1';
             qty.value = (defaultQty === null || typeof defaultQty === 'undefined') ? '' : String(parseInt(defaultQty,10));
-            qty.required = true;
+            // Pas de `required` : une quantité vide est ramenée à 1 au submit (clampQty). Voir astuce UI.
             qty.oninput = () => { updateTotal(); };
             qty.addEventListener('blur', () => { clampQty(qty); updateTotal(); });
 
@@ -641,7 +643,8 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             prix.className = 'pac-price';
             prix.step = '0.01';
             prix.placeholder = 'Prix (€ HT)';
-            prix.required = true;
+            // Pas de `required` HTML5 : le prix est validé en JS au submit (uniquement pour les lignes
+            // ayant un matériel sélectionné), pour éviter de bloquer sur une ligne vide.
             if (defaultPrice !== '') { prix.value = Number(defaultPrice).toFixed(2); }
             prix.oninput = updateTotal;
 
@@ -959,13 +962,27 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                     if (dateC && !dateC.value) { _setErr(dateC, 'Date de creation requise.'); valid = false; } else { _clrErr(dateC); }
                     if (dateE && !dateE.value) { _setErr(dateE, 'Date d\'echeance requise.'); valid = false; } else { _clrErr(dateE); }
 
-                    var hasItems = false;
-                    document.querySelectorAll('.piece-card').forEach(c => { if(c.querySelectorAll('.pac-group').length>0) hasItems=true; });
-                    if (!hasItems) { if(typeof showToast==='function') showToast('Ajoutez au moins un materiel.','error'); valid = false; }
+                    // Au moins un matériel doit être sélectionné (le select étant masqué, on valide ici).
+                    var validRows = 0, badPrice = false;
+                    document.querySelectorAll('.pac-group').forEach(row => {
+                        var sel = row.querySelector('select[name="pac_ids[]"]');
+                        if (sel && sel.value) {
+                            validRows++;
+                            var pr = row.querySelector('.pac-price');
+                            if (!pr || pr.value === '' || isNaN(Number(pr.value))) badPrice = true;
+                        }
+                    });
+                    if (validRows === 0) { if(typeof showToast==='function') showToast('Selectionnez au moins un materiel dans la liste.','error'); valid = false; }
+                    else if (badPrice) { if(typeof showToast==='function') showToast('Renseignez un prix pour chaque materiel.','error'); valid = false; }
 
                     if (!valid) { e.preventDefault(); var fe=form.querySelector('.field-error'); if(fe)fe.scrollIntoView({behavior:'smooth',block:'center'}); return; }
 
                     // --- Original logic ---
+                    // Retirer les lignes sans matériel sélectionné (évite d'envoyer des lignes vides en base).
+                    document.querySelectorAll('.pac-group').forEach(row => {
+                        var sel = row.querySelector('select[name="pac_ids[]"]');
+                        if (!sel || !sel.value) row.remove();
+                    });
                     document.querySelectorAll('.pac-qty').forEach(clampQty);
                     document.querySelectorAll('.piece-card').forEach(card => {
                         if (card.querySelectorAll('.pac-group').length === 0) card.remove();
@@ -1072,7 +1089,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
       <h2>Preparation du devis</h2>
       <p class="muted">Sélectionnez le client, ajoutez des pièces et des matériels, puis validez.</p>
 
-      <form id="form-devis" method="POST" action="traitement_devis.php" target="_blank" class="stack">
+      <form id="form-devis" method="POST" action="traitement_devis.php" target="_blank" class="stack" data-submit-once>
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
         <input type="hidden" id="copied_from_id" name="copied_from_id" value="">
 
@@ -1318,5 +1335,6 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
 <?php require __DIR__ . '/inc/toast.php'; ?>
 <?php require __DIR__ . '/inc/modal.php'; ?>
+<script src="inc/submit-once.js"></script>
 </body>
 </html>

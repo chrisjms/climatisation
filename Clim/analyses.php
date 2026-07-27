@@ -385,17 +385,18 @@ $granularityText = granularityText($view === 'all' ? 'year' : $view);
 </div>
 
 <script>
-/* Donnees PHP -> JS */
-const labelsDevis     = <?= json_encode($labelsDevis, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
-const countDevis      = <?= json_encode($countDevis, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
-const totalDevis      = <?= json_encode($totalDevis, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
+/* Donnees PHP -> JS — flags HEX_* pour neutraliser `</script>` ou `<!--` injectés via les données BDD */
+<?php $JSON_SAFE = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT; ?>
+const labelsDevis     = <?= json_encode($labelsDevis, $JSON_SAFE) ?>;
+const countDevis      = <?= json_encode($countDevis, $JSON_SAFE) ?>;
+const totalDevis      = <?= json_encode($totalDevis, $JSON_SAFE) ?>;
 
-const labelsFactures  = <?= json_encode($labelsFactures, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
-const countFactures   = <?= json_encode($countFactures, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
-const totalFactures   = <?= json_encode($totalFactures, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>;
+const labelsFactures  = <?= json_encode($labelsFactures, $JSON_SAFE) ?>;
+const countFactures   = <?= json_encode($countFactures, $JSON_SAFE) ?>;
+const totalFactures   = <?= json_encode($totalFactures, $JSON_SAFE) ?>;
 
 // Pour le formatage, on traite "all" comme une echelle annuelle
-const currentView = <?= json_encode($view === 'all' ? 'year' : $view) ?>;
+const currentView = <?= json_encode($view === 'all' ? 'year' : $view, $JSON_SAFE) ?>;
 
 function fmtLabel(label){
     // year: "2025"

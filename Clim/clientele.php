@@ -5,6 +5,7 @@
 // - On n'utilise PAS uploaded_at (qui est désormais NULL à l'upload).
 require 'auth.php';
 require 'config.php';
+require __DIR__ . '/inc/helpers.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 if (empty($_SESSION['csrf_token'])) { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); }
@@ -22,17 +23,6 @@ $debug_bdc          = isset($_GET['debug_bdc']) ? (bool)$_GET['debug_bdc'] : fal
 $bdc_debug_log      = [];
 
 /* ───────── Helpers robustes ───────── */
-function table_exists(PDO $pdo, string $name): bool {
-    $stmt = $pdo->prepare("SHOW TABLES LIKE ?");
-    $stmt->execute([$name]);
-    return (bool)$stmt->fetchColumn();
-}
-function list_columns(PDO $pdo, string $table): array {
-    $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table`");
-    $stmt->execute();
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    return array_map(fn($r) => $r['Field'], $rows ?: []);
-}
 function table_has_columns(PDO $pdo, string $table, array $required): bool {
     if (!table_exists($pdo, $table)) return false;
     $cols = list_columns($pdo, $table);
@@ -280,7 +270,6 @@ if ($selected_client_id) {
     $bdc = fetch_bdc_for_client($pdo, (int)$selected_client_id, $debug_bdc, $bdc_debug_log);
 }
 
-function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function initials($prenom, $nom){
     $p = trim((string)$prenom); $n = trim((string)$nom);
     $i = ($p !== '' ? mb_substr($p,0,1) : '') . ($n !== '' ? mb_substr($n,0,1) : '');
@@ -841,7 +830,7 @@ function normalize_phone_for_link($raw){
                 <td class="text-center">
                   <form method="POST" action="supprimer_facture.php" class="inline" onsubmit="event.preventDefault(); var f=this; confirmAction('Supprimer cette facture ?', function(){ f.submit(); }, {title:'Suppression', confirmText:'Supprimer', danger:true})">
                     <input type="hidden" name="facture_id" value="<?= (int)$f['id'] ?>">
-                    <input type="hidden" name="fichier_pdf" value <?= '"'.h((string)$f['fichier_pdf']).'"' ?>>
+                    <input type="hidden" name="fichier_pdf" value="<?= h((string)$f['fichier_pdf']) ?>">
                     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
                     <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
                   </form>
@@ -1009,7 +998,7 @@ document.addEventListener('click', async function(e){
         body: JSON.stringify({ client_id: parseInt(clientId,10), details })
       });
       if(!res.ok){ const t=await res.text(); alert('Échec : '+t); return; }
-      view.innerHTML = details.trim() ? details.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') : '<span class="small-muted">Aucune note pour l'instant.</span>';
+      view.innerHTML = details.trim() ? details.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') : '<span class="small-muted">Aucune note pour l\'instant.</span>';
       toggle(false);
       showToast('Sauvegarde', 'success');
     }catch(e){ alert('Erreur réseau'); console.error(e); }

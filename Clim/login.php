@@ -1,6 +1,7 @@
 <?php
 session_start();
 require 'config.php'; // doit fournir $pdo
+require __DIR__ . '/inc/helpers.php';
 
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     http_response_code(500);
@@ -12,8 +13,6 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
-
-function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 $message = '';
 
