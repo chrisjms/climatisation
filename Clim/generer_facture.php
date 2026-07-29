@@ -302,12 +302,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // recalculée : la facture reprend au centime près ce qui a été chiffré sur le devis.
     $lignesTva = [];
     foreach ($lignes as $l) {
-        $lHt  = round((float)$l['total_ht'], 2);
-        $lTtc = round((float)$l['total_ttc'], 2);
+        // tva_round2() et non round() : d'anciennes lignes ont pu être stockées dans une
+        // colonne FLOAT et porter plus de 2 décimales.
+        $lHt  = tva_round2($l['total_ht']  ?? 0);
+        $lTtc = tva_round2($l['total_ttc'] ?? 0);
         $lignesTva[] = [
             'ht'   => $lHt,
             'taux' => tva_normalise_taux($l['tva_taux'] ?? null),
-            'tva'  => round($lTtc - $lHt, 2),
+            'tva'  => tva_round2($lTtc - $lHt),
         ];
     }
     $totaux    = tva_totaux($lignesTva);

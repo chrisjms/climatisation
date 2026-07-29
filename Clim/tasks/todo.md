@@ -511,8 +511,26 @@ somme des lignes de ventilation = Total TVA ; HT + TVA = TTC ; somme de la colon
 **Reste à faire en recette (base de production requise) :** vérifier l'`ALTER TABLE`,
 créer un devis mixte 5,5 / 10 / 20 et comparer devis ↔ BDC ↔ facture.
 
-**À nettoyer un jour :** `pdf_common_totaux.php` n'est inclus par aucun fichier et
-réimplémente l'ancien calcul par taux agrégé — piège si quelqu'un le rebranche.
+## Troisième passe
+
+- [x] `Clim/pdf_common_totaux.php` supprimé : jamais inclus depuis le premier commit,
+      aucun appel à ses deux fonctions, aucun include dynamique dans le dépôt.
+      La copie `energia/pdf_common_totaux.php` n'est pas touchée.
+- [x] `generer_facture.php` utilise `tva_round2()` au lieu de `round()` sur les montants
+      relus en base : d'anciennes lignes ont pu être stockées en FLOAT avec plus de 2 décimales.
+- [x] Vérifié : aucun cast entier sur un taux nulle part, les taux circulent en float.
+- [x] Vérifié : `$totaux` est bien affecté avant la validation de l'acompte dans la facture.
+- [x] Vérifié : `tva_totaux([])` ne plante pas, double `require` sans collision, tout
+      `Clim/*.php` passe `php -l`.
+
+**Effet de bord du correctif d'arrondi :** le contrôle serveur
+`abs($mont1 - $total_ttc) > 0.01` pouvait rejeter un devis valide quand l'écart
+front/back tombait pile sur un centime. Vérifié sur 4 000 devis : zéro rejet.
+
+**Connu, non traité :** dans `generer_bdc.php`, la branche de secours qui lit les lignes
+depuis une colonne JSON ne remonte pas le drapeau `offert` (antérieur, hors TVA).
+Les devis créés AVANT ce correctif ont un `montant_ttc` calculé à l'ancienne : une
+facture générée aujourd'hui peut en différer d'un centime. Non rattrapable.
 
 **Non traité :** le taux 2,1 % (presse/médicaments, hors métier) — accessible via « Autre… » ;
 la mention obligatoire d'autoliquidation sous-traitance BTP qui doit accompagner un 0 %.
