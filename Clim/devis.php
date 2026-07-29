@@ -705,7 +705,15 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                 updateTotal();
             };
             tvaCustom.oninput = () => { syncTvaCell(row); updateTotal(); };
-            tvaCustom.addEventListener('blur', () => { syncTvaCell(row); updateTotal(); });
+            tvaCustom.addEventListener('blur', () => {
+                syncTvaCell(row);
+                // Champ vidé ou saisie rejetée : on réaffiche le taux réellement retenu.
+                // Sans ça, l'écran montre un champ vide pendant que les totaux calculent 20 %.
+                if (tvaCustom.value.trim() === '' || Number(tvaCustom.value) !== Number(tvaValue.value)) {
+                    tvaCustom.value = tvaValue.value;
+                }
+                updateTotal();
+            });
 
             tvaCell.append(tvaValue, tva, tvaCustom);
 
@@ -880,9 +888,12 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             return parseFloat(raw);
         }
 
+        // Mêmes règles que tva_normalise_taux() : hors de [0, 100] on retombe sur le taux
+        // par défaut, on ne borne PAS. Borner ici donnerait un total affiché à 100 % alors
+        // que le serveur enregistrerait 20 % : le PDF ne correspondrait plus à l'écran.
         function clampRate(n) {
-            if (isNaN(n)) return TVA_DEFAUT;
-            return Math.min(100, Math.max(0, Math.round(n * 100) / 100));
+            if (isNaN(n) || n < 0 || n > 100) return TVA_DEFAUT;
+            return Math.round(n * 100) / 100;
         }
 
         // Pendant JS de tva_label_taux() : « 20 % », « 5,5 % », « 0 % »
@@ -970,24 +981,27 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             updateTotal();
         }
 
-        // === Rounding robuste à 2 décimales ===
+        // === Arrondi monétaire à 2 décimales ===
+        // Doit reproduire EXACTEMENT round2() / tva_round2() côté PHP, sinon l'écran et le
+        // PDF diffèrent d'un centime. Le décalage vaut 1e-12, pas Number.EPSILON (2,2e-16) :
+        // EPSILON est un écart absolu calibré pour des valeurs proches de 1, donc négligeable
+        // sur un montant à 5 chiffres — 8 658,595 € retombait à 8 658,59 au lieu de 8 658,60.
         function round2(n) {
-            return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+            n = Number(n);
+            return Math.round((n + (n < 0 ? -1e-12 : 1e-12)) * 100) / 100;
         }
 
-        // === Calcul des totaux avec "mix TVA" (regroupement par taux) ===
+        // === Calcul des totaux (mix de taux) ===
+        // Accumulation LIGNE PAR LIGNE, strictement identique à tva_totaux() côté PHP :
+        // agréger la base puis appliquer le taux décale d'un centime et l'écran ne
+        // correspondrait plus au PDF. Ne pas modifier l'un sans l'autre.
         function updateTotal() {
             let totalHT = 0;
-            let totalTTC = 0;
-
-            // Totaux par taux de TVA (pour le total global)
-            const globalHTByRate = {};
+            let totalTVA = 0;
 
             document.querySelectorAll('.piece-card').forEach(card => {
-                // Pour le sous-total pièce
-                const pieceHTByRate = {};
                 let pieceHT = 0;
-                let pieceTTC = 0;
+                let pieceTVA = 0;
 
                 card.querySelectorAll('.pac-group').forEach(row => {
                     const prix = parseFloat(row.querySelector('.pac-price')?.value || '0');
@@ -998,33 +1012,23 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
                     const tvaV = rowTvaRate(row);
                     // Article offert : ne compte pour rien dans les totaux
-                    const lineHT = isOffertRow(row) ? 0 : round2((isNaN(prix) ? 0 : prix) * qty);
+                    const lineHT  = isOffertRow(row) ? 0 : round2((isNaN(prix) ? 0 : prix) * qty);
+                    const lineTVA = round2(lineHT * tvaV / 100);
 
-                    const rKey = String(tvaV);
-                    pieceHTByRate[rKey] = round2((pieceHTByRate[rKey] || 0) + lineHT);
-                    globalHTByRate[rKey] = round2((globalHTByRate[rKey] || 0) + lineHT);
+                    pieceHT  = round2(pieceHT  + lineHT);
+                    pieceTVA = round2(pieceTVA + lineTVA);
                 });
 
-                Object.keys(pieceHTByRate).forEach(key => {
-                    const rate = parseFloat(key);
-                    const ht = pieceHTByRate[key];
-                    pieceHT = round2(pieceHT + ht);
-                    pieceTTC = round2(pieceTTC + round2(ht * (1 + (isNaN(rate) ? 0.20 : (rate/100)))));
-                });
-
-                totalHT = round2(totalHT + pieceHT);
+                totalHT  = round2(totalHT  + pieceHT);
+                totalTVA = round2(totalTVA + pieceTVA);
 
                 const subHTEl  = card.querySelector('.subtotal-ht');
                 const subTTCEl = card.querySelector('.subtotal-ttc');
                 if (subHTEl)  subHTEl.textContent  = pieceHT.toFixed(2) + ' €';
-                if (subTTCEl) subTTCEl.textContent = pieceTTC.toFixed(2) + ' €';
+                if (subTTCEl) subTTCEl.textContent = round2(pieceHT + pieceTVA).toFixed(2) + ' €';
             });
 
-            Object.keys(globalHTByRate).forEach(key => {
-                const rate = parseFloat(key);
-                const ht = globalHTByRate[key];
-                totalTTC = round2(totalTTC + round2(ht * (1 + (isNaN(rate) ? 0.20 : (rate/100)))));
-            });
+            const totalTTC = round2(totalHT + totalTVA);
 
             const totalEl = document.getElementById('total');
             if (totalEl) totalEl.textContent = totalHT.toFixed(2) + ' €';

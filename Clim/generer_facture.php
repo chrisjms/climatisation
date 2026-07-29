@@ -297,15 +297,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lignes[] = $ln;
     }
 
-    // Totaux globaux (mix TVA) + base HT regroupée par taux, pour la ventilation imprimée
-    $total_ht = 0.0; $total_ttc = 0.0; $htByRate = [];
+    // Totaux globaux + ventilation par taux, via le même calcul que le devis et le BDC.
+    // La TVA de chaque ligne est déduite des montants stockés (TTC - HT) plutôt que
+    // recalculée : la facture reprend au centime près ce qui a été chiffré sur le devis.
+    $lignesTva = [];
     foreach ($lignes as $l) {
-        $total_ht  += (float)$l['total_ht'];
-        $total_ttc += (float)$l['total_ttc'];
-        $rateKey = (string)tva_normalise_taux($l['tva_taux'] ?? null);
-        $htByRate[$rateKey] = round(($htByRate[$rateKey] ?? 0.0) + (float)$l['total_ht'], 2);
+        $lHt  = round((float)$l['total_ht'], 2);
+        $lTtc = round((float)$l['total_ttc'], 2);
+        $lignesTva[] = [
+            'ht'   => $lHt,
+            'taux' => tva_normalise_taux($l['tva_taux'] ?? null),
+            'tva'  => round($lTtc - $lHt, 2),
+        ];
     }
-    $total_tva = $total_ttc - $total_ht;
+    $totaux    = tva_totaux($lignesTva);
+    $total_ht  = $totaux['ht'];
+    $total_tva = $totaux['tva'];
+    $total_ttc = $totaux['ttc'];
 
     // Valide acompte : on refuse explicitement plutôt que de clamper silencieusement.
     if ($acompte < 0) {
@@ -725,14 +733,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     };
     $row('Total HT',  $total_ht);
     // Multi-taux : ventilation base HT / taxe par taux obligatoire sur facture (art. 242 nonies A CGI).
-    $ventilation = tva_ventilation($htByRate);
-    if (count($ventilation) > 1) {
-        foreach ($ventilation as $v) {
+    if (count($totaux['lignes']) > 1) {
+        foreach ($totaux['lignes'] as $v) {
             $row('TVA '.$v['label'].' sur '.number_format($v['ht'], 2, ',', ' ').' € HT', $v['tva']);
         }
         $row('Total TVA', $total_tva);
     } else {
-        $row('TVA '.($ventilation[0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
+        $row('TVA '.($totaux['lignes'][0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
     }
     $row('Total TTC', $total_ttc);
     if ($acompte > 0) {

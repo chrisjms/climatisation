@@ -257,7 +257,7 @@ $DEFAULT_PIECE_NAME = 'Sans pièce';
 
 $total_ht = 0.0; $total_tva = 0.0; $total_ttc = 0.0;
 $pieceOrder = []; $pieceTotals = []; $grouped = [];
-$htByRate = []; // clé du bucket : "0", "5.5", "10", "20"…
+$lignesTva = []; // pour tva_totaux() : [['ht'=>, 'taux'=>, 'tva'=>], ...]
 
 foreach ($lines as &$ln) {
     $qty = (int)($ln['quantite'] ?? 0);
@@ -266,7 +266,8 @@ foreach ($lines as &$ln) {
     $tva = tva_normalise_taux($ln['tva'] ?? null);
 
     // Article offert : ne pèse rien dans les totaux (le prix stocké est déjà 0, on sécurise).
-    if (!empty($ln['offert'])) { $pu = 0.0; $tva = 0.0; $ln['prix_ht'] = 0.0; }
+    // Le taux est conservé, comme sur le devis : avec une base nulle la TVA l'est aussi.
+    if (!empty($ln['offert'])) { $pu = 0.0; $ln['prix_ht'] = 0.0; }
 
     $lht  = round2($qty * $pu);
     $ltva = round2($lht * ($tva/100.0));
@@ -286,20 +287,15 @@ foreach ($lines as &$ln) {
     $pieceTotals[$pKey]['ttc'] = round2($pieceTotals[$pKey]['ttc'] + $lttc);
     $grouped[$pKey][] = $ln;
 
-    $total_ht = round2($total_ht + $lht);
-
-    $rk = (string)$tva;
-    $htByRate[$rk] = round2(($htByRate[$rk] ?? 0.0) + $lht);
+    $lignesTva[] = ['ht' => $lht, 'taux' => $tva, 'tva' => $ltva];
 }
 unset($ln);
 
-// Calcul TTC global par regroupement de taux (aligné devis)
-$total_ttc = 0.0;
-foreach ($htByRate as $rateStr => $ht) {
-    $rate = (float)$rateStr;
-    $total_ttc = round2($total_ttc + round2($ht * (1 + ($rate/100.0))));
-}
-$total_tva = round2($total_ttc - $total_ht);
+// Totaux et ventilation par taux, accumulés ligne à ligne (aligné devis et facture)
+$totaux    = tva_totaux($lignesTva);
+$total_ht  = $totaux['ht'];
+$total_tva = $totaux['tva'];
+$total_ttc = $totaux['ttc'];
 
 /* ────────── Table BDC + numérotation ────────── */
 function ensureBdcTable(PDO $pdo) {
@@ -700,14 +696,13 @@ if ($method === 'POST') {
     };
     $row('Total HT',  $total_ht);
     // Multi-taux : on détaille la base HT et la taxe par taux, comme sur le devis et la facture.
-    $ventilation = tva_ventilation($htByRate);
-    if (count($ventilation) > 1) {
-        foreach ($ventilation as $v) {
+    if (count($totaux['lignes']) > 1) {
+        foreach ($totaux['lignes'] as $v) {
             $row('TVA '.$v['label'].' sur '.number_format($v['ht'], 2, ',', ' ').' € HT', $v['tva']);
         }
         $row('Total TVA', $total_tva);
     } else {
-        $row('TVA '.($ventilation[0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
+        $row('TVA '.($totaux['lignes'][0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
     }
     $row('Total TTC', $total_ttc);
 

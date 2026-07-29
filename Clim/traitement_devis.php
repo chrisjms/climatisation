@@ -104,7 +104,7 @@ if ($ba1) {
 /* ───── Helpers arrondis ───── */
 function round2($n) { return round((float)$n + 1e-12, 2); }
 
-/* ───── Lignes + totaux (arrondi par ligne, mix TVA 0/10/20) ───── */
+/* ───── Lignes + totaux (arrondi par ligne, mix de taux) ───── */
 $materiels = [];          // lignes à plat (avec piece_key/nom)
 $pieceOrder = [];         // ordre d'apparition des pièces
 $pieceTotals = [];        // key => ['nom'=>..., 'ht'=>..., 'ttc'=>...]
@@ -113,8 +113,9 @@ $total_ht  = 0.0;
 $total_tva = 0.0;
 $total_ttc = 0.0;
 
-// Pour calcul global TTC : regrouper le HT par taux, puis appliquer la TVA par groupe
-$htByRate = []; // ex: [0.0=>123.45, 10.0=>..., 20.0=>...]
+// Lignes brutes pour tva_totaux() : totaux et ventilation sont calculés en une fois,
+// par accumulation ligne à ligne (cf. inc/tva.php).
+$lignesTva = []; // [['ht'=>, 'taux'=>, 'tva'=>], ...]
 
 // taille max des tableaux postés
 $rowCount = max(
@@ -154,11 +155,14 @@ for ($i = 0; $i < $rowCount; $i++) {
     $pName = $pieceNameByKey[$pKey] ?? $DEFAULT_PIECE_NAME;
 
     if ($offert) {
-        // Article offert : PU et TVA forcés à 0 pour ne rien peser dans les totaux,
-        // mais la ligne reste imprimée sur le devis avec la mention « Offert ».
+        // Article offert : seul le PU est forcé à 0 — la ligne reste imprimée avec la
+        // mention « Offert » et ne pèse rien dans les totaux (une base HT nulle donne
+        // une TVA nulle quel que soit le taux).
+        // Le taux, lui, est CONSERVÉ : l'écraser à 0 le perdait définitivement, et une
+        // reprise du devis suivie d'un décochage de « Offert » redonnait le prix à la
+        // ligne mais la laissait à 0 % de TVA — donc un devis sous-taxé en silence.
         if ($pac <= 0 && $lbl === '') continue;   // ligne réellement vide
-        $pu   = 0.0;
-        $tvaI = 0.0;
+        $pu = 0.0;
     } elseif ($pu <= 0) {
         continue;                     // ignore les lignes vides
     }
@@ -191,10 +195,8 @@ for ($i = 0; $i < $rowCount; $i++) {
     $pieceTotals[$pKey]['ht']  = round2($pieceTotals[$pKey]['ht']  + $ligne_ht);
     $pieceTotals[$pKey]['ttc'] = round2($pieceTotals[$pKey]['ttc'] + $ligne_ttc);
 
-    // Totaux globaux
-    $total_ht = round2($total_ht + $ligne_ht);
-    $rateKey  = (string)$tvaI; // clé du bucket : "0", "5.5", "10", "20"…
-    $htByRate[$rateKey] = round2(($htByRate[$rateKey] ?? 0.0) + $ligne_ht);
+    // Alimente le calcul global (totaux + ventilation par taux)
+    $lignesTva[] = ['ht' => $ligne_ht, 'taux' => $tvaI, 'tva' => $ligne_tva];
 
     $materiels[] = [
         'pac_id'     => ($pac > 0 ? $pac : null),
@@ -213,13 +215,11 @@ for ($i = 0; $i < $rowCount; $i++) {
 
 if (!$materiels) { http_response_code(400); exit('Aucune ligne de matériel valide.'); }
 
-// Calcul final TTC par regroupement de taux (aligné front)
-$total_ttc = 0.0;
-foreach ($htByRate as $rateStr => $ht) {
-    $rate = (float)$rateStr;
-    $total_ttc = round2($total_ttc + round2($ht * (1 + ($rate/100.0))));
-}
-$total_tva = round2($total_ttc - $total_ht);
+// Totaux et ventilation par taux, accumulés ligne à ligne (aligné front et facture)
+$totaux    = tva_totaux($lignesTva);
+$total_ht  = $totaux['ht'];
+$total_tva = $totaux['tva'];
+$total_ttc = $totaux['ttc'];
 
 // ───── Vérification du paiement UNIQUE (sur total TTC global) ─────
 $mont1 = round2($mont1);
@@ -605,14 +605,13 @@ $__totalRow = function($pdf, $label, $value) {
 };
 $__totalRow($pdf, 'Total HT',  $total_ht);
 // Multi-taux : la ventilation base HT / taxe par taux est obligatoire (art. 242 nonies A CGI).
-$__ventilation = tva_ventilation($htByRate);
-if (count($__ventilation) > 1) {
-    foreach ($__ventilation as $v) {
+if (count($totaux['lignes']) > 1) {
+    foreach ($totaux['lignes'] as $v) {
         $__totalRow($pdf, 'TVA '.$v['label'].' sur '.number_format($v['ht'], 2, ',', ' ').' € HT', $v['tva']);
     }
     $__totalRow($pdf, 'Total TVA', $total_tva);
 } else {
-    $__totalRow($pdf, 'TVA '.($__ventilation[0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
+    $__totalRow($pdf, 'TVA '.($totaux['lignes'][0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
 }
 $__totalRow($pdf, 'Total TTC', $total_ttc);
 $__totalRow($pdf, 'Net à payer', $total_ttc);
@@ -661,7 +660,10 @@ try {
 // totaux recalculés en aval (facture, BDC). On l'élargit une fois pour toutes.
 try {
     $colTva = $pdo->query("SHOW COLUMNS FROM devis_lignes LIKE 'tva_taux'")->fetch(PDO::FETCH_ASSOC);
-    if ($colTva && !preg_match('/^decimal\(\d+,\s*[1-9]\d*\)/i', (string)$colTva['Type'])) {
+    // Il faut au moins 2 décimales : decimal(5,1) laisserait passer 5,5 mais tronquerait 20,25.
+    $scaleOk = preg_match('/^decimal\(\s*\d+\s*,\s*(\d+)\s*\)/i', (string)($colTva['Type'] ?? ''), $mTva)
+               && (int)$mTva[1] >= 2;
+    if ($colTva && !$scaleOk) {
         $null    = (strtoupper((string)($colTva['Null'] ?? 'YES')) === 'NO') ? 'NOT NULL' : 'NULL';
         $pdo->exec("ALTER TABLE devis_lignes MODIFY tva_taux DECIMAL(5,2) $null DEFAULT 20.00");
     }

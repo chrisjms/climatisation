@@ -486,8 +486,33 @@ ventilation par taux).
 - [x] Ventilation base HT / taxe par taux sur les documents multi-taux (art. 242 nonies A CGI)
 - [x] Suppression du hack historique `'0.0'` (0 % falsy en PHP)
 
+## Relecture ciblée bugs (avant mise en ligne)
+
+Cinq défauts trouvés à la relecture, dont trois antérieurs à cette feature :
+
+- [x] **Divergence front/back sur taux hors bornes** — le JS bornait à [0,100] (150 % → 100 %)
+      là où PHP retombe sur 20 %. L'écran et le PDF affichaient des totaux différents.
+- [x] **`round2()` du JS décalé de `Number.EPSILON`** au lieu de `1e-12` (préexistant) :
+      un décalage absolu calibré pour des valeurs proches de 1, donc inopérant sur un montant
+      à 5 chiffres. 8 658,595 € tombait à 8 658,59 côté écran et 8 658,60 côté PDF.
+- [x] **Deux chemins d'arrondi coexistaient** (préexistant) : le devis totalisait par taux
+      agrégé, la facture sommait les lignes stockées. Écart d'un centime sur **13 %** des
+      devis multi-lignes. Unifié sur l'accumulation ligne à ligne dans `tva_totaux()`.
+- [x] **Le taux était écrasé à 0 sur les articles offerts** (préexistant) : après reprise d'un
+      devis, décocher « Offert » rendait le prix mais laissait la ligne à 0 % de TVA.
+- [x] **Champ « Autre… » vidé** : l'écran montrait un champ vide pendant que les totaux
+      calculaient 20 %. Le taux retenu est réaffiché au blur.
+- [x] Migration : exiger 2 décimales et non 1 (`decimal(5,1)` tronquerait 20,25 %).
+
+Invariants prouvés par fuzzing (200 000 devis aléatoires, 1 à 6 lignes, 7 taux) :
+somme des lignes de ventilation = Total TVA ; HT + TVA = TTC ; somme de la colonne TTC
+= Total TTC ; total facture = total devis. Et 4 000 devis comparés écran ↔ document : 0 écart.
+
 **Reste à faire en recette (base de production requise) :** vérifier l'`ALTER TABLE`,
 créer un devis mixte 5,5 / 10 / 20 et comparer devis ↔ BDC ↔ facture.
+
+**À nettoyer un jour :** `pdf_common_totaux.php` n'est inclus par aucun fichier et
+réimplémente l'ancien calcul par taux agrégé — piège si quelqu'un le rebranche.
 
 **Non traité :** le taux 2,1 % (presse/médicaments, hors métier) — accessible via « Autre… » ;
 la mention obligatoire d'autoliquidation sous-traitance BTP qui doit accompagner un 0 %.
