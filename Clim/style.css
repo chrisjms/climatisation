@@ -1390,9 +1390,26 @@ h4.cat-title {
 .piece-title-wrap input[type="text"] { max-width: 360px; width: 100%; }
 .piece-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.pac-heads { display: grid; grid-template-columns: 1.2fr 1fr 100px 130px 90px 78px 44px; gap: 10px; margin-top: 10px; color: var(--muted); font-size: var(--fs-12); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.pac-group { display: grid; grid-template-columns: 1.2fr 1fr 100px 130px 90px 78px 44px; gap: 10px; align-items: center; margin-top: 10px; }
+.pac-heads { display: grid; grid-template-columns: 1.2fr 1fr 100px 130px 104px 78px 44px; gap: 10px; margin-top: 10px; color: var(--muted); font-size: var(--fs-12); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.pac-group { display: grid; grid-template-columns: 1.2fr 1fr 100px 130px 104px 78px 44px; gap: 10px; align-items: center; margin-top: 10px; }
 .pac-qty, .pac-price, .pac-tva { width: 100%; }
+
+/* ─────────────── TVA : cran + saisie libre ─────────────── */
+/* Le champ « Autre… » s'empile sous la liste : il n'apparaît que sur demande,
+   la ligne ne grandit donc que dans le cas rare du taux personnalisé. */
+.tva-cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.tva-cell .pac-tva-custom { width: 100%; font-family: var(--font-mono); font-size: var(--fs-13); }
+.tva-cell .pac-tva-custom[hidden] { display: none; }
+
+/* Application groupée : un seul taux pour tout le devis, cas de loin le plus fréquent */
+.tva-bulk {
+  display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 10px; border: 1.5px solid var(--bd); border-radius: var(--r-md); background: var(--card);
+}
+.tva-bulk label { margin: 0; font-size: var(--fs-13); font-weight: 600; color: var(--ink-secondary); white-space: nowrap; }
+.tva-bulk select { width: auto; min-width: 96px; }
+.tva-bulk input[type="number"] { width: 84px; }
+.tva-bulk input[type="number"][hidden] { display: none; }
 
 /* ─────────────── Article offert ─────────────── */
 .offert-toggle {
@@ -1403,7 +1420,7 @@ h4.cat-title {
 }
 .offert-toggle input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--success); margin: 0; }
 .pac-group.is-offert .pac-price { background: var(--bg-2); color: var(--muted); text-decoration: line-through; cursor: not-allowed; }
-.pac-group.is-offert .pac-tva { opacity: .55; }
+.pac-group.is-offert .tva-cell { opacity: .55; }
 .pac-group.is-offert .offert-toggle { color: var(--success); }
 .remove-btn { background: var(--danger); color: #fff; border: none; padding: 8px 12px; cursor: pointer; border-radius: var(--r-md); font-weight: 600; transition: all var(--transition); }
 .remove-btn:hover { background: #b91c1c; }

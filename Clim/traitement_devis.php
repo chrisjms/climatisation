@@ -3,7 +3,7 @@
  *  traitement_devis.php — tFPDF (UTF-8) + enregistrement en BDD
  *  - Colonnes : Description | Qté | PU HT | TVA | TTC
  *  - 1re colonne = 2 étages : libellé (gras 8pt) + description (normal 7pt)
- *  - Calculs par ligne avec TVA 0 %, 10 % ou 20 % (mix possible)
+ *  - Calculs par ligne, taux de TVA libre (mix possible) — cf. inc/tva.php
  *  - Date de création affichée SANS HEURE, sous le N° (en-tête à droite)
  *  - DejaVu obligatoire (UTF-8)
  *  - ✅ Support des PIÈCES (Salon, Cuisine, …) :
@@ -15,6 +15,7 @@
 require 'auth.php';
 require 'config.php';
 require __DIR__ . '/inc/helpers.php';
+require __DIR__ . '/inc/tva.php';
 
 // Garde-fou anti-doublon sur la numérotation (race condition possible entre deux POST concurrents)
 ensure_unique_index($pdo, 'devis', 'numero');
@@ -143,12 +144,9 @@ for ($i = 0; $i < $rowCount; $i++) {
     $pac  = isset($pac_ids[$i])   ? (int)$pac_ids[$i] : 0;
     $offert = isset($offerts[$i]) && (string)$offerts[$i] === '1';
 
-    // TVA acceptée : 0 / 10 / 20 ; toute autre valeur => 20
-    $tvaRaw = $tva_taux_arr[$i] ?? 20;
-    $tvaI   = is_numeric($tvaRaw) ? (float)$tvaRaw : 20.0;
-    if (abs($tvaI - 0.0) < 0.001)      { $tvaI = 0.0; }
-    elseif (abs($tvaI - 10.0) < 0.001) { $tvaI = 10.0; }
-    else                                { $tvaI = 20.0; }
+    // Taux libre borné à [0, 100] — validation centralisée dans inc/tva.php.
+    // 0 % est une valeur légitime : ne jamais la traiter comme « vide ».
+    $tvaI = tva_normalise_taux($tva_taux_arr[$i] ?? null);
 
     // Pièce de la ligne
     $pKey = isset($piece_keys[$i]) ? trim((string)$piece_keys[$i]) : '';
@@ -195,7 +193,7 @@ for ($i = 0; $i < $rowCount; $i++) {
 
     // Totaux globaux
     $total_ht = round2($total_ht + $ligne_ht);
-    $rateKey  = (string)$tvaI; // clé "0", "10", "20"
+    $rateKey  = (string)$tvaI; // clé du bucket : "0", "5.5", "10", "20"…
     $htByRate[$rateKey] = round2(($htByRate[$rateKey] ?? 0.0) + $ligne_ht);
 
     $materiels[] = [
@@ -486,7 +484,8 @@ class PDF_Devis extends tFPDF {
             $this->SetFont('DejaVu','',8);
         } else {
             $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
-            $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
+            // tva_label_taux() et non number_format(..., 0) : un taux à 5,5 % s'imprimerait « 6 % ».
+            $this->Cell($wTVA, $hRow, tva_label_taux($tva), 0, 0, 'C');
             $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
         }
 
@@ -605,7 +604,16 @@ $__totalRow = function($pdf, $label, $value) {
     $pdf->Cell(30,6,number_format($value,2,',',' ').' €',0,1,'R');
 };
 $__totalRow($pdf, 'Total HT',  $total_ht);
-$__totalRow($pdf, 'Total TVA', $total_tva);
+// Multi-taux : la ventilation base HT / taxe par taux est obligatoire (art. 242 nonies A CGI).
+$__ventilation = tva_ventilation($htByRate);
+if (count($__ventilation) > 1) {
+    foreach ($__ventilation as $v) {
+        $__totalRow($pdf, 'TVA '.$v['label'].' sur '.number_format($v['ht'], 2, ',', ' ').' € HT', $v['tva']);
+    }
+    $__totalRow($pdf, 'Total TVA', $total_tva);
+} else {
+    $__totalRow($pdf, 'TVA '.($__ventilation[0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
+}
 $__totalRow($pdf, 'Total TTC', $total_ttc);
 $__totalRow($pdf, 'Net à payer', $total_ttc);
 
@@ -646,6 +654,19 @@ try {
     }
 } catch (Throwable $e) {
     error_log('[MIGRATION devis_lignes.offert] '.$e->getMessage());
+}
+
+// Type de la colonne tva_taux : les taux réduits ont une décimale (5,5 %). Si la colonne
+// est restée entière, MySQL arrondirait silencieusement 5.5 en 6 et fausserait tous les
+// totaux recalculés en aval (facture, BDC). On l'élargit une fois pour toutes.
+try {
+    $colTva = $pdo->query("SHOW COLUMNS FROM devis_lignes LIKE 'tva_taux'")->fetch(PDO::FETCH_ASSOC);
+    if ($colTva && !preg_match('/^decimal\(\d+,\s*[1-9]\d*\)/i', (string)$colTva['Type'])) {
+        $null    = (strtoupper((string)($colTva['Null'] ?? 'YES')) === 'NO') ? 'NOT NULL' : 'NULL';
+        $pdo->exec("ALTER TABLE devis_lignes MODIFY tva_taux DECIMAL(5,2) $null DEFAULT 20.00");
+    }
+} catch (Throwable $e) {
+    error_log('[MIGRATION devis_lignes.tva_taux] '.$e->getMessage());
 }
 
 try {

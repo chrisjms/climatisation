@@ -11,6 +11,7 @@
 require 'auth.php';
 require 'config.php';
 require __DIR__ . '/inc/helpers.php';
+require __DIR__ . '/inc/tva.php';
 
 define('FPDF_FONTPATH', __DIR__ . '/tfpdf/font/');
 $tfpdfPath = __DIR__ . '/tfpdf/tfpdf.php';
@@ -245,14 +246,10 @@ if (empty($lines)) abortX(500, "Aucune ligne trouvée pour ce devis.");
 /* ────────── Enrichissement pièces si manquantes ────────── */
 $lines = enrichPiecesFromDB($pdo, $devisId, $lines);
 
-/* ────────── Helpers arrondis + normalisation TVA ────────── */
+/* ────────── Helpers arrondis ────────── */
 function round2($n){ return round((float)$n + 1e-12, 2); }
-function normRate($r){
-    $r = is_numeric($r) ? (float)$r : 20.0;
-    if (abs($r-0.0)<0.001)  return 0.0;
-    if (abs($r-10.0)<0.001) return 10.0;
-    return 20.0;
-}
+// La normalisation TVA vit dans inc/tva.php : l'ancienne version locale rabattait tout
+// taux inconnu sur 20 %, ce qui transformait un devis à 5,5 % en BDC à 20 %.
 
 /* ────────── Totaux + groupement par pièce (arrondi par ligne) ────────── */
 $DEFAULT_PIECE_KEY  = '_global';
@@ -260,13 +257,13 @@ $DEFAULT_PIECE_NAME = 'Sans pièce';
 
 $total_ht = 0.0; $total_tva = 0.0; $total_ttc = 0.0;
 $pieceOrder = []; $pieceTotals = []; $grouped = [];
-$htByRate = []; // clé "0", "10", "20"
+$htByRate = []; // clé du bucket : "0", "5.5", "10", "20"…
 
 foreach ($lines as &$ln) {
     $qty = (int)($ln['quantite'] ?? 0);
     if ($qty <= 0) $qty = 1;
     $pu  = (float)($ln['prix_ht'] ?? 0);
-    $tva = normRate($ln['tva'] ?? 20.0);
+    $tva = tva_normalise_taux($ln['tva'] ?? null);
 
     // Article offert : ne pèse rien dans les totaux (le prix stocké est déjà 0, on sécurise).
     if (!empty($ln['offert'])) { $pu = 0.0; $tva = 0.0; $ln['prix_ht'] = 0.0; }
@@ -605,7 +602,8 @@ if ($method === 'POST') {
                 $this->SetFont('DejaVu','',8);
             } else {
                 $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
-                $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
+                // tva_label_taux() et non number_format(..., 0) : un taux à 5,5 % s'imprimerait « 6 % ».
+                $this->Cell($wTVA, $hRow, tva_label_taux($tva), 0, 0, 'C');
                 $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
             }
 
@@ -701,7 +699,16 @@ if ($method === 'POST') {
         $pdf->Cell(30,6,number_format($value,2,',',' ').' €',0,1,'R');
     };
     $row('Total HT',  $total_ht);
-    $row('Total TVA', $total_tva);
+    // Multi-taux : on détaille la base HT et la taxe par taux, comme sur le devis et la facture.
+    $ventilation = tva_ventilation($htByRate);
+    if (count($ventilation) > 1) {
+        foreach ($ventilation as $v) {
+            $row('TVA '.$v['label'].' sur '.number_format($v['ht'], 2, ',', ' ').' € HT', $v['tva']);
+        }
+        $row('Total TVA', $total_tva);
+    } else {
+        $row('TVA '.($ventilation[0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
+    }
     $row('Total TTC', $total_ttc);
 
     $labelA = ($atype==='percent') ? ('Acompte demandé ('.number_format($aval,2,',',' ').' %)') : 'Acompte demandé';

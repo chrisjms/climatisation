@@ -468,3 +468,27 @@ Every page follows: `auth.php + config.php → PHP logic → HTML with sidebar.p
 
 ## Review Notes
 *(To be filled after implementation)*
+
+---
+
+# TVA paramétrable (2026-07-29)
+
+Le taux était figé à 0 / 10 / 20 % en dur dans 4 fichiers, chacun avec sa propre
+normalisation. Centralisé dans `inc/tva.php` (liste des taux, validation, formatage,
+ventilation par taux).
+
+- [x] `inc/tva.php` — source de vérité unique, incluse par devis / traitement / facture / BDC
+- [x] Sélecteur par crans `20 / 10 / 5,5 / 0` + échappatoire « Autre… » (taux libre borné 0–100)
+- [x] Bouton « TVA de toutes les lignes » (cas courant : devis à taux unique)
+- [x] Migration auto `devis_lignes.tva_taux` → `DECIMAL(5,2)` (un INT tronquerait 5,5 en 6)
+- [x] Correction : les 3 PDF imprimaient le taux avec `number_format(..., 0)` → « 6 % » pour 5,5 %
+- [x] Correction : `normRate()` du BDC rabattait tout taux inconnu sur 20 %
+- [x] Ventilation base HT / taxe par taux sur les documents multi-taux (art. 242 nonies A CGI)
+- [x] Suppression du hack historique `'0.0'` (0 % falsy en PHP)
+
+**Reste à faire en recette (base de production requise) :** vérifier l'`ALTER TABLE`,
+créer un devis mixte 5,5 / 10 / 20 et comparer devis ↔ BDC ↔ facture.
+
+**Non traité :** le taux 2,1 % (presse/médicaments, hors métier) — accessible via « Autre… » ;
+la mention obligatoire d'autoliquidation sous-traitance BTP qui doit accompagner un 0 %.
+Le dossier `energia/` (autre client) garde son ancienne logique 0/10/20.

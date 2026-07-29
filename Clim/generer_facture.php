@@ -14,6 +14,7 @@
 require 'auth.php';
 require 'config.php';
 require __DIR__ . '/inc/helpers.php';
+require __DIR__ . '/inc/tva.php';
 
 // Garde-fou anti-doublon sur la numérotation des factures
 ensure_unique_index($pdo, 'factures', 'numero');
@@ -296,11 +297,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lignes[] = $ln;
     }
 
-    // Totaux globaux (mix TVA)
-    $total_ht = 0.0; $total_ttc = 0.0;
+    // Totaux globaux (mix TVA) + base HT regroupée par taux, pour la ventilation imprimée
+    $total_ht = 0.0; $total_ttc = 0.0; $htByRate = [];
     foreach ($lignes as $l) {
         $total_ht  += (float)$l['total_ht'];
         $total_ttc += (float)$l['total_ttc'];
+        $rateKey = (string)tva_normalise_taux($l['tva_taux'] ?? null);
+        $htByRate[$rateKey] = round(($htByRate[$rateKey] ?? 0.0) + (float)$l['total_ht'], 2);
     }
     $total_tva = $total_ttc - $total_ht;
 
@@ -593,7 +596,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $this->SetFont('DejaVu','',8);
             } else {
                 $this->Cell($wPU,  $hRow, number_format((float)$pu,  2, ',', ' ').' €', 0, 0, 'R');
-                $this->Cell($wTVA, $hRow, number_format((float)$tva, 0, ',', ' ').' %', 0, 0, 'C');
+                // tva_label_taux() et non number_format(..., 0) : un taux à 5,5 % s'imprimerait « 6 % ».
+                $this->Cell($wTVA, $hRow, tva_label_taux($tva), 0, 0, 'C');
                 $this->Cell($wTTC, $hRow, number_format((float)$ttc, 2, ',', ' ').' €', 0, 1, 'R');
             }
 
@@ -703,7 +707,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $desc= (string)($m['_desc'] ?? '');
             $qty = (int)$m['quantite'];
             $pu  = (float)$m['prix_unitaire'];
-            $tva = (float)$m['tva_taux']; // 10 ou 20
+            $tva = (float)$m['tva_taux'];
             $ttc = (float)$m['total_ttc'];
             $pdf->RowDescription($lib, $desc, $qty, $pu, $tva, $ttc, !empty($m['offert']));
         }
@@ -720,7 +724,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell(30,6,number_format((float)$value,2,',',' ').' €',0,1,'R');
     };
     $row('Total HT',  $total_ht);
-    $row('Total TVA', $total_tva);
+    // Multi-taux : ventilation base HT / taxe par taux obligatoire sur facture (art. 242 nonies A CGI).
+    $ventilation = tva_ventilation($htByRate);
+    if (count($ventilation) > 1) {
+        foreach ($ventilation as $v) {
+            $row('TVA '.$v['label'].' sur '.number_format($v['ht'], 2, ',', ' ').' € HT', $v['tva']);
+        }
+        $row('Total TVA', $total_tva);
+    } else {
+        $row('TVA '.($ventilation[0]['label'] ?? tva_label_taux(TVA_TAUX_DEFAUT)), $total_tva);
+    }
     $row('Total TTC', $total_ttc);
     if ($acompte > 0) {
         $row('Acompte payé', -$acompte);

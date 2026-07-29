@@ -1,6 +1,7 @@
 <?php
 require 'auth.php';
 require 'config.php';
+require __DIR__ . '/inc/tva.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 if (empty($_SESSION['csrf_token'])) { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); }
@@ -479,6 +480,12 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
         // Données matériels disponibles (depuis PHP)
         const pacData = <?= json_encode($pac_list, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) ?>;
 
+        // Taux de TVA proposés — servis par inc/tva.php, qui valide aussi côté serveur.
+        // Un seul endroit à modifier le jour où un taux change.
+        const tvaRates    = <?= json_encode(tva_taux_courants(), JSON_UNESCAPED_UNICODE) ?>;
+        const TVA_DEFAUT  = <?= json_encode(TVA_TAUX_DEFAUT) ?>;
+        const TVA_AUTRE   = '__autre';
+
         // Gestion des pièces
         let pieceCounter = 0;
         function newPieceKey() { pieceCounter++; return 'p' + pieceCounter; }
@@ -558,7 +565,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                         (typeof it.quantite !== 'undefined' ? Number(it.quantite) : null),
                         it.libelle || '',
                         (typeof it.prix_ht !== 'undefined' ? Number(it.prix_ht) : ''),
-                        (typeof it.tva !== 'undefined' ? Number(it.tva) : 20),
+                        (typeof it.tva !== 'undefined' ? Number(it.tva) : TVA_DEFAUT),
                         !!it.offert
                     );
                 });
@@ -570,7 +577,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             return card;
         }
 
-        function addPacRow(containerEl, pieceKey, defaultId = '', defaultQty = null, defaultLabel = '', defaultPrice = '', defaultTva = 20, defaultOffert = false) {
+        function addPacRow(containerEl, pieceKey, defaultId = '', defaultQty = null, defaultLabel = '', defaultPrice = '', defaultTva = TVA_DEFAUT, defaultOffert = false) {
             if (!containerEl) return;
             const row = document.createElement('div');
             row.className = 'pac-group';
@@ -655,18 +662,52 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             if (defaultPrice !== '') { prix.value = Number(defaultPrice).toFixed(2); }
             prix.oninput = updateTotal;
 
+            // ── Cellule TVA : liste des taux courants + échappatoire « Autre… ».
+            // Le taux réellement posté vit dans un input hidden : le <select> peut valoir
+            // "__autre", et un taux de 0 % n'a plus besoin du hack "0.0" d'autrefois puisque
+            // la valeur postée est toujours une chaîne explicite, jamais un champ absent.
+            const tvaCell = document.createElement('div');
+            tvaCell.className = 'tva-cell';
+
+            const tvaValue = document.createElement('input');
+            tvaValue.type  = 'hidden';
+            tvaValue.name  = 'tva_taux[]';
+            tvaValue.className = 'pac-tva-value';
+
             const tva = document.createElement('select');
-            tva.name = 'tva_taux[]';
             tva.className = 'pac-tva';
-            // IMPORTANT : valeur 0 % = "0.0" (truthy en PHP), évite le fallback à 20 %
-            [['20','20 %'], ['10','10 %'], ['0.0','0 %']].forEach(([val, label]) => {
-                const o = new Option(label, val);
+            tvaRates.forEach(r => {
+                const o = new Option(r.label, String(r.taux));
+                o.title = r.aide || '';
                 tva.appendChild(o);
             });
-            // Conserver les valeurs pré-remplies (0, 10, 20) en les adaptant
-            const tvaVal = (Number(defaultTva) === 0 ? '0.0' : (Number(defaultTva) === 10 ? '10' : '20'));
-            tva.value = tvaVal;
-            tva.onchange = updateTotal;
+            tva.appendChild(new Option('Autre…', TVA_AUTRE));
+
+            const tvaCustom = document.createElement('input');
+            tvaCustom.type = 'number';
+            tvaCustom.className = 'pac-tva-custom';
+            tvaCustom.step = '0.1';
+            tvaCustom.min  = '0';
+            tvaCustom.max  = '100';
+            tvaCustom.title = 'Taux personnalisé, en pourcentage';
+            tvaCustom.hidden = true;
+
+            tva.onchange = () => {
+                if (tva.value === TVA_AUTRE) {
+                    tvaCustom.hidden = false;
+                    if (tvaCustom.value === '') tvaCustom.value = String(Number(tvaValue.value) || 0);
+                    tvaCustom.focus();
+                    tvaCustom.select();
+                } else {
+                    tvaCustom.hidden = true;
+                }
+                syncTvaCell(row);
+                updateTotal();
+            };
+            tvaCustom.oninput = () => { syncTvaCell(row); updateTotal(); };
+            tvaCustom.addEventListener('blur', () => { syncTvaCell(row); updateTotal(); });
+
+            tvaCell.append(tvaValue, tva, tvaCustom);
 
             // ── Case "Offert" : la ligne reste imprimée sur le devis mais ne pèse rien dans les totaux.
             // Le drapeau est un input hidden TOUJOURS posté ('0' ou '1') : une checkbox non cochée
@@ -697,8 +738,11 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             btn.title   = 'Retirer cette ligne';
             btn.onclick = () => { row.remove(); updateTotal(); };
 
-            row.append(wrap, libelle, qty, prix, tva, offertWrap, btn);
+            row.append(wrap, libelle, qty, prix, tvaCell, offertWrap, btn);
             containerEl.appendChild(row);
+
+            // Positionne le taux initial (catalogue, reprise de devis ou brouillon)
+            setRowTva(row, defaultTva);
 
             function highlight(text, q){
               const i = text.toLowerCase().indexOf(q.toLowerCase());
@@ -818,6 +862,77 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             return !!(box && box.checked);
         }
 
+        // ── TVA d'une ligne ────────────────────────────────────────────────────
+        // Le hidden input `.pac-tva-value` est la SEULE source de vérité : c'est lui
+        // qui part en POST, le <select> et le champ « Autre… » ne sont que l'interface.
+
+        function rowTvaRate(row) {
+            const hidden = row.querySelector('.pac-tva-value');
+            const n = parseFloat(hidden ? hidden.value : '');
+            return isNaN(n) ? TVA_DEFAUT : n;
+        }
+
+        // Pendant JS de la conversion faite par tva_normalise_taux() : « 13,5 » et « 13.5 »
+        // désignent le même taux. Sans ça, parseFloat('13,5') vaut 13 et l'écran afficherait
+        // un total différent de celui enregistré en base.
+        function parseRate(raw) {
+            if (typeof raw === 'string') raw = raw.trim().replace(',', '.');
+            return parseFloat(raw);
+        }
+
+        function clampRate(n) {
+            if (isNaN(n)) return TVA_DEFAUT;
+            return Math.min(100, Math.max(0, Math.round(n * 100) / 100));
+        }
+
+        // Pendant JS de tva_label_taux() : « 20 % », « 5,5 % », « 0 % »
+        function tvaLabel(rate) {
+            const known = tvaRates.find(t => Number(t.taux) === rate);
+            return known ? known.label : String(rate).replace('.', ',') + ' %';
+        }
+
+        // Recalcule le hidden depuis l'état visible. Le bornage à [0, 100] et l'arrondi
+        // à 2 décimales reproduisent tva_normalise_taux() côté PHP : même règle des deux côtés.
+        function syncTvaCell(row) {
+            const sel    = row.querySelector('.pac-tva');
+            const custom = row.querySelector('.pac-tva-custom');
+            const hidden = row.querySelector('.pac-tva-value');
+            if (!sel || !hidden) return;
+
+            const raw = (sel.value === TVA_AUTRE)
+                ? parseRate(custom ? custom.value : '')
+                : parseRate(sel.value);
+            hidden.value = String(clampRate(raw));
+        }
+
+        // Applique un taux : cale le select sur le cran correspondant s'il existe, bascule
+        // sur « Autre… » sinon — cas d'un devis repris avec un taux sorti de la liste depuis.
+        function setRowTva(row, rate) {
+            const sel    = row.querySelector('.pac-tva');
+            const custom = row.querySelector('.pac-tva-custom');
+            const hidden = row.querySelector('.pac-tva-value');
+            if (!sel || !hidden) return;
+
+            const r = clampRate(parseRate(rate));
+            if (tvaRates.some(t => Number(t.taux) === r)) {
+                sel.value = String(r);
+                if (custom) { custom.hidden = true; custom.value = ''; }
+            } else {
+                sel.value = TVA_AUTRE;
+                if (custom) { custom.hidden = false; custom.value = String(r); }
+            }
+            hidden.value = String(r);
+        }
+
+        // Applique un taux à toutes les lignes du devis (cas courant : tout le devis
+        // au même taux, qu'on ne veut pas saisir ligne par ligne).
+        function applyTvaToAllRows(rate) {
+            const rows = document.querySelectorAll('.pac-group');
+            rows.forEach(row => setRowTva(row, rate));
+            updateTotal();
+            return rows.length;
+        }
+
         function clampQty(input) {
             const raw = (input.value ?? '').trim();
             const n = parseInt(raw, 10);
@@ -881,11 +996,11 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                     let qty = (qtyRaw === '' ? 1 : parseInt(qtyRaw, 10));
                     if (isNaN(qty) || qty < 1) qty = 1;
 
-                    const tvaV = parseFloat(row.querySelector('.pac-tva')?.value || '20');
+                    const tvaV = rowTvaRate(row);
                     // Article offert : ne compte pour rien dans les totaux
                     const lineHT = isOffertRow(row) ? 0 : round2((isNaN(prix) ? 0 : prix) * qty);
 
-                    const rKey = String(isNaN(tvaV) ? 20 : tvaV);
+                    const rKey = String(tvaV);
                     pieceHTByRate[rKey] = round2((pieceHTByRate[rKey] || 0) + lineHT);
                     globalHTByRate[rKey] = round2((globalHTByRate[rKey] || 0) + lineHT);
                 });
@@ -960,18 +1075,39 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
             }
         }
 
-        // Normalise les valeurs TVA à "0.0" avant envoi (évite le fallback PHP)
-        function normalizeZeroTvaBeforeSubmit() {
-            document.querySelectorAll('select.pac-tva').forEach(sel => {
-                if (sel && (sel.value === '0' || sel.value === 0)) {
-                    sel.value = '0.0';
-                }
-            });
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
             const addBtn = document.getElementById('add-piece-btn');
             if (addBtn) addBtn.addEventListener('click', (e) => { e.preventDefault(); addPiece('Pièce'); });
+
+            // ── Application groupée du taux de TVA
+            const bulkSel    = document.getElementById('tva-bulk-select');
+            const bulkCustom = document.getElementById('tva-bulk-custom');
+            const bulkApply  = document.getElementById('tva-bulk-apply');
+            if (bulkSel && bulkApply) {
+                bulkSel.addEventListener('change', () => {
+                    const autre = (bulkSel.value === TVA_AUTRE);
+                    if (!bulkCustom) return;
+                    bulkCustom.hidden = !autre;
+                    if (autre) { bulkCustom.focus(); bulkCustom.select(); }
+                });
+                bulkApply.addEventListener('click', () => {
+                    const raw = (bulkSel.value === TVA_AUTRE)
+                        ? parseRate(bulkCustom ? bulkCustom.value : '')
+                        : parseRate(bulkSel.value);
+                    if (isNaN(raw)) {
+                        if (typeof showToast === 'function') showToast('Indiquez un taux de TVA.', 'error');
+                        return;
+                    }
+                    const rate = clampRate(raw);
+                    const n = applyTvaToAllRows(rate);
+                    window.__devisDirty = true;
+                    if (typeof showToast === 'function') {
+                        showToast(n > 0
+                            ? 'TVA ' + tvaLabel(rate) + ' appliquee a ' + n + ' ligne' + (n > 1 ? 's' : '') + '.'
+                            : 'Aucune ligne a modifier.', n > 0 ? 'success' : 'error');
+                    }
+                });
+            }
 
             const prefill = window.__prefill || null;
             // Auto-save draft restore
@@ -1058,7 +1194,6 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                     document.querySelectorAll('.piece-card').forEach(card => {
                         if (card.querySelectorAll('.pac-group').length === 0) card.remove();
                     });
-                    normalizeZeroTvaBeforeSubmit();
                     syncDateCreation();
                     const totals = updateTotal();
                     const m1 = document.getElementById('montant_paiement_1');
@@ -1099,7 +1234,7 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
                                 libelle: (row.querySelector('input[name="libelles[]"]') || {}).value || '',
                                 quantite: parseInt((row.querySelector('.pac-qty') || {}).value) || 1,
                                 prix_ht: parseFloat((row.querySelector('.pac-price') || {}).value) || 0,
-                                tva: parseFloat((row.querySelector('.pac-tva') || {}).value) || 20,
+                                tva: rowTvaRate(row),
                                 offert: isOffertRow(row)
                             });
                         });
@@ -1189,6 +1324,25 @@ function link_pdf(?string $path, string $defaultDir = ''): string {
 
         <div class="pieces-toolbar">
           <button type="button" id="add-piece-btn" class="add-piece-btn">+ Ajouter une pièce</button>
+
+          <!-- Raccourci : la grande majorité des devis est à un taux unique.
+               Le taux reste modifiable ligne par ligne pour les devis mixtes. -->
+          <div class="tva-bulk">
+            <label for="tva-bulk-select">TVA de toutes les lignes</label>
+            <select id="tva-bulk-select">
+              <?php foreach (tva_taux_courants() as $t): ?>
+                <option value="<?= htmlspecialchars((string)$t['taux'], ENT_QUOTES, 'UTF-8') ?>"
+                        title="<?= htmlspecialchars($t['aide'], ENT_QUOTES, 'UTF-8') ?>">
+                  <?= htmlspecialchars($t['label'], ENT_QUOTES, 'UTF-8') ?>
+                </option>
+              <?php endforeach; ?>
+              <option value="__autre">Autre…</option>
+            </select>
+            <input type="number" id="tva-bulk-custom" step="0.1" min="0" max="100"
+                   placeholder="%" title="Taux personnalisé, en pourcentage" hidden>
+            <button type="button" id="tva-bulk-apply" class="btn-outline">Appliquer</button>
+          </div>
+
           <span class="muted">Astuce : les quantités laissées vides seront prises comme <strong>1</strong> à l'enregistrement.</span>
         </div>
 
